@@ -53,7 +53,7 @@ public final class TimelineOps {
         long srcOut;
         if (out != null) {
             srcOut = out;
-        } else if (kind == MediaKind.IMAGE) {
+        } else if (m.info().stillImage()) {
             srcOut = srcIn + p.fps().frames(5); // images default to 5 s, like Kdenlive
         } else {
             srcOut = mediaLen;
@@ -155,10 +155,13 @@ public final class TimelineOps {
             }
             case ClipItem c -> {
                 MediaClip m = d.media(c.mediaId());
-                long newIn = in == null ? c.in() : in;
-                long newOut = out == null ? c.out() : out;
-                checkSourceRange(d, m, newIn, newOut);
-                long len = newOut - newIn;
+                // in/out are source times; a speed-changed clip counts frames of the retimed clip
+                long srcIn = in == null ? c.sourceInFrames() : in;
+                long srcOut = out == null ? c.sourceOutFrames() : out;
+                checkSourceRange(d, m, srcIn, srcOut);
+                long newIn = Math.round(srcIn / c.speed());
+                long newOut = srcOut;
+                long len = Math.max(1, Math.round(srcOut / c.speed()) - newIn);
                 Optional<Located> partner = d.partner(c);
                 Set<String> ignore = new HashSet<>(Set.of(c.id()));
                 partner.ifPresent(pl -> ignore.add(pl.item().id()));
@@ -166,7 +169,7 @@ public final class TimelineOps {
                 partner.ifPresent(pl -> d.requireFree(pl.track().id(), pl.item().start(), len, ignore));
                 d.replace(clampFades(d, c.withSource(newIn, len)));
                 partner.ifPresent(pl -> d.replace(clampFades(d, ((ClipItem) pl.item()).withSource(newIn, len))));
-                String summary = "trimmed " + d.describe(c) + " to in=" + d.sec(newIn) + " out=" + d.sec(newOut)
+                String summary = "trimmed " + d.describe(c) + " to in=" + d.sec(srcIn) + " out=" + d.sec(newOut)
                         + " (" + d.sec(c.start()) + "–" + d.sec(c.start() + len) + " on timeline)"
                         + partner.map(pl -> "; linked " + pl.item().id() + " trimmed too").orElse("");
                 TransitionOps.prune(d);
@@ -241,12 +244,13 @@ public final class TimelineOps {
         long leftLen = at - c.start();
         AudioSettings a = c.audio();
         ClipItem left = new ClipItem(c.id(), c.mediaId(), c.start(), c.in(), leftLen, c.linkId(),
-                new AudioSettings(a.volumeDb(), Math.min(a.fadeIn(), leftLen), 0), c.extras(), c.effects());
+                new AudioSettings(a.volumeDb(), Math.min(a.fadeIn(), leftLen), 0), c.extras(), c.effects(), c.speed(),
+                c.keepPitch());
         long rightLen = c.length() - leftLen;
         // keyframes are in source frames, so both halves keep the same animation
         ClipItem right = new ClipItem(rightId, c.mediaId(), at, c.in() + leftLen, rightLen, rightLink,
                 new AudioSettings(a.volumeDb(), 0, Math.min(a.fadeOut(), rightLen)), c.extras(),
-                d.copyEffects(c.effects()));
+                d.copyEffects(c.effects()), c.speed(), c.keepPitch());
         d.replace(left);
         d.put(trackId, right);
     }
@@ -255,7 +259,7 @@ public final class TimelineOps {
 
     static void checkSourceRange(Draft d, MediaClip m, long in, long out) {
         long len = m.lengthFrames(d.fps());
-        boolean image = m.kind() == MediaKind.IMAGE;
+        boolean image = m.info().stillImage();
         String limits = image ? "" : m.label() + " is " + d.sec(len) + "s long";
         if (in < 0) {
             throw new EditException("in=" + d.sec(in) + " is invalid: must be >= 0");

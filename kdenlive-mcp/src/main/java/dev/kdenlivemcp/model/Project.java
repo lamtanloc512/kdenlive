@@ -13,9 +13,11 @@ import java.util.Optional;
  * @param nextId counter for new short ids (m1, c2, t3, x4, e5 share one sequence)
  * @param meta document-level data (uuid, ids, unmodelled settings)
  * @param masterEffects effects on the whole sequence (Kdenlive's "master" effects), applied after the tracks mix
+ * @param subtitles the subtitle track (empty when none)
  */
 public record Project(Path file, Profile profile, List<MediaClip> bin, List<Track> tracks,
-                      List<Transition> transitions, long nextId, DocumentMeta meta, List<Effect> masterEffects) {
+                      List<Transition> transitions, long nextId, DocumentMeta meta, List<Effect> masterEffects,
+                      Subtitles subtitles) {
 
     /** Owner key of master effects in effect locations and the id map. */
     public static final String MASTER = "master";
@@ -25,11 +27,19 @@ public record Project(Path file, Profile profile, List<MediaClip> bin, List<Trac
         tracks = List.copyOf(tracks);
         transitions = List.copyOf(transitions);
         masterEffects = masterEffects == null ? List.of() : List.copyOf(masterEffects);
+        if (subtitles == null) {
+            subtitles = Subtitles.EMPTY;
+        }
+    }
+
+    public Project(Path file, Profile profile, List<MediaClip> bin, List<Track> tracks, List<Transition> transitions,
+                   long nextId, DocumentMeta meta, List<Effect> masterEffects) {
+        this(file, profile, bin, tracks, transitions, nextId, meta, masterEffects, Subtitles.EMPTY);
     }
 
     public Project(Path file, Profile profile, List<MediaClip> bin, List<Track> tracks, List<Transition> transitions,
                    long nextId, DocumentMeta meta) {
-        this(file, profile, bin, tracks, transitions, nextId, meta, List.of());
+        this(file, profile, bin, tracks, transitions, nextId, meta, List.of(), Subtitles.EMPTY);
     }
 
     public Fps fps() {
@@ -46,10 +56,11 @@ public record Project(Path file, Profile profile, List<MediaClip> bin, List<Trac
 
     /** Timeline duration in frames (end of the last item on any track). */
     public long duration() {
-        return tracks.stream().mapToLong(Track::end).max().orElse(0);
+        long subs = subtitles.lines().stream().mapToLong(Subtitles.Line::end).max().orElse(0);
+        return Math.max(subs, tracks.stream().mapToLong(Track::end).max().orElse(0));
     }
 
     public Project withFile(Path newFile) {
-        return new Project(newFile, profile, bin, tracks, transitions, nextId, meta, masterEffects);
+        return new Project(newFile, profile, bin, tracks, transitions, nextId, meta, masterEffects, subtitles);
     }
 }

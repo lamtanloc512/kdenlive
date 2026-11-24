@@ -32,7 +32,22 @@ public record MediaInfo(
         String formatName,
         long fileSize) {
 
+    /** formatName of color clips; their path is {@code color:0xRRGGBBAA}. */
+    public static final String COLOR_FORMAT = "color";
+
+    public static MediaInfo color(String hex) {
+        return new MediaInfo(java.nio.file.Path.of("color:" + hex), 0, true, false, true, 0, 0, null, 0, false, null,
+                null, 0, 0, COLOR_FORMAT, 0);
+    }
+
+    public boolean isColor() {
+        return COLOR_FORMAT.equals(formatName);
+    }
+
     public MediaKind kind() {
+        if (isColor()) {
+            return MediaKind.COLOR;
+        }
         if (stillImage) {
             return MediaKind.IMAGE;
         }

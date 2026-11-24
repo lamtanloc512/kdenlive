@@ -86,7 +86,7 @@ public class KdenliveXmlBackend implements EditorBackend {
             refreshed.add(clip);
         }
         return new Project(p.file(), p.profile(), refreshed, p.tracks(), p.transitions(), p.nextId(), p.meta(),
-                p.masterEffects());
+                p.masterEffects(), p.subtitles());
     }
 
     @Override
@@ -99,7 +99,8 @@ public class KdenliveXmlBackend implements EditorBackend {
 
     /** Media files referenced by the project that are missing on disk. */
     public List<Path> missingMedia(Project p) {
-        return p.bin().stream().map(MediaClip::path).filter(f -> !Files.isRegularFile(f)).toList();
+        return p.bin().stream().filter(m -> !m.info().isColor()).map(MediaClip::path)
+                .filter(f -> !Files.isRegularFile(f)).toList();
     }
 
     // ------------------------------------------------------------------ render

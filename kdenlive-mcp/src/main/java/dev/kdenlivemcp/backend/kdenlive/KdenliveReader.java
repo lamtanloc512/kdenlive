@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.kdenlivemcp.media.MediaInfo;
 import dev.kdenlivemcp.model.AudioSettings;
 import dev.kdenlivemcp.model.ClipItem;
+import dev.kdenlivemcp.model.Subtitles;
 import dev.kdenlivemcp.model.Composition;
 import dev.kdenlivemcp.model.DocumentMeta;
 import dev.kdenlivemcp.model.EditException;
@@ -363,8 +364,11 @@ public final class KdenliveReader {
             }
         }
         List<Effect> master = new ArrayList<>();
+        Subtitles subtitles = Subtitles.EMPTY;
         for (Element f : Xml.children(seq, "filter")) {
-            if (Xml.prop(f, "internal_added") == null) {
+            if ("avfilter.subtitles".equals(Xml.prop(f, Effect.SERVICE)) && Xml.prop(f, "internal_added") != null) {
+                subtitles = readSubtitles(f);
+            } else if (Xml.prop(f, "internal_added") == null) {
                 if (isEffect(f)) {
                     master.add(effectFrom(f, Project.MASTER + "#" + master.size()));
                 } else {
@@ -379,7 +383,7 @@ public final class KdenliveReader {
         DocumentMeta meta = new DocumentMeta(uuid,
                 binProps.getOrDefault("kdenlive:docproperties.documentid", Long.toString(System.currentTimeMillis())),
                 new Extras(metaProps, seqXml));
-        return new Project(file, profile, media, tracks, transitions, nextId, meta, master);
+        return new Project(file, profile, media, tracks, transitions, nextId, meta, master, subtitles);
     }
 
     // ------------------------------------------------------------------ pieces
@@ -414,7 +418,18 @@ public final class KdenliveReader {
             }
             Map<String, String> props = Xml.properties(prod);
             String service = props.getOrDefault("mlt_service", "");
-            if (service.startsWith("avformat") || service.equals("qimage") || service.equals("pixbuf")) {
+            if (service.equals("color")) {
+                int binId = Integer.parseInt(props.getOrDefault("kdenlive:id", "0"));
+                Map<String, String> extras = new LinkedHashMap<>();
+                props.forEach((k, val) -> {
+                    if (!MANAGED_MEDIA_PROPS.contains(k) && !k.equals("mlt_image_format") && !k.equals("kdenlive:duration")) {
+                        extras.put(k, val);
+                    }
+                });
+                out.add(new MediaClip(mediaId(binId), binId, Path.of("color:" + props.getOrDefault("resource", "0x000000ff")),
+                        props.getOrDefault("kdenlive:clipname", "Color Clip"), MediaInfo.color(props.getOrDefault("resource",
+                        "0x000000ff")), new Extras(extras, List.of())));
+            } else if (service.startsWith("avformat") || service.equals("qimage") || service.equals("pixbuf")) {
                 int binId = Integer.parseInt(props.getOrDefault("kdenlive:id", "0"));
                 Path path = resolve(props.get("resource"));
                 String id = mediaId(binId);
@@ -433,7 +448,7 @@ public final class KdenliveReader {
         }
         if (!unsupported.isEmpty()) {
             throw new EditException(file.getFileName() + " contains bin clips kdenlive-mcp v1 cannot edit: "
-                    + String.join(", ", unsupported) + ". Supported: video/audio files, images and titles.");
+                    + String.join(", ", unsupported) + ". Supported: video/audio files, images, color clips and titles.");
         }
         return out;
     }
@@ -547,8 +562,15 @@ public final class KdenliveReader {
             throw new EditException("timeline clip at " + fps.sec(r.start) + "s refers to bin id " + r.binId
                     + " which is not a file clip kdenlive-mcp supports");
         }
+        double speed = 1;
+        boolean keepPitch = false;
+        if ("timewarp".equals(Xml.prop(r.producer, Effect.SERVICE))) {
+            Double ws = dev.kdenlivemcp.assets.ParamCodec.parseDouble(Xml.prop(r.producer, "warp_speed"));
+            speed = ws == null || ws <= 0 ? 1 : ws; // reverse (negative) speed is not modelled: played forward
+            keepPitch = "1".equals(Xml.prop(r.producer, "warp_pitch"));
+        }
         return new ClipItem(r.id, m.id(), r.start, r.in, r.length, r.linkId,
-                new AudioSettings(volume, fadeIn, fadeOut), new Extras(Map.of(), passthrough), effects);
+                new AudioSettings(volume, fadeIn, fadeOut), new Extras(Map.of(), passthrough), effects, speed, keepPitch);
     }
 
     private String titleTextFromFile(Map<String, String> props) {
@@ -562,6 +584,31 @@ public final class KdenliveReader {
         } catch (Exception e) {
             return "";
         }
+    }
+
+    // ------------------------------------------------------------------ subtitles
+
+    /** Kdenlive's saved subtitles live next to the project; the filter's path may point to a session temp file. */
+    private Subtitles readSubtitles(Element filter) {
+        Map<String, String> props = Xml.properties(filter);
+        String filename = props.get("av.filename");
+        for (String k : List.of("av.filename", "av.alpha", Effect.SERVICE, "internal_added")) {
+            props.remove(k);
+        }
+        List<Path> candidates = new ArrayList<>(List.of(KdenliveWriter.subtitleFile(file)));
+        if (filename != null && !filename.isBlank()) {
+            candidates.add(resolve(filename));
+        }
+        for (Path c : candidates) {
+            try {
+                if (Files.isRegularFile(c)) {
+                    return AssFile.parse(Files.readString(c), fps, props);
+                }
+            } catch (Exception e) {
+                // unreadable: try the next one
+            }
+        }
+        return new Subtitles(null, Subtitles.Style.DEFAULT, List.of(), props);
     }
 
     // ------------------------------------------------------------------ compositions

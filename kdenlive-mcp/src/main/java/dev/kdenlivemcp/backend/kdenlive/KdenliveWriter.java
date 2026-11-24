@@ -79,6 +79,8 @@ public final class KdenliveWriter {
     private final Map<Path, String> titleFiles = new LinkedHashMap<>();
     private final Map<String, Placed> placedById = new HashMap<>();
     private final Map<String, Integer> trackIndexOfItem = new HashMap<>();
+    /** Per-item producers (timewarp for speed-changed clips). */
+    private final Map<String, String> producerOfItem = new HashMap<>();
 
     /** Optional [from, to] frame range for the project tractor (frame grabs, partial renders). */
     private long[] playRange;
@@ -207,6 +209,8 @@ public final class KdenliveWriter {
         Map<String, String> chainsByMedia = new LinkedHashMap<>();
         for (Placed pl : placed.stream().sorted(Comparator.comparingLong(Placed::start)).toList()) {
             switch (pl.item()) {
+                case ClipItem c when c.speedChanged() ->
+                        producerOfItem.put(c.id(), writeTimewarpProducer(p.media(c.mediaId()).orElseThrow(), track.kind(), c));
                 case ClipItem c -> chainsByMedia.computeIfAbsent(c.mediaId(),
                         id -> writeMediaProducer(p.media(id).orElseThrow(), track.kind()));
                 case TitleItem t -> titleProducerIds.put(t.id(), writeTitleProducer(t, pl));
@@ -306,7 +310,7 @@ public final class KdenliveWriter {
 
     private void writeEntry(Element playlist, Placed pl, Track track, Map<String, String> chains) {
         String producer = switch (pl.item()) {
-            case ClipItem c -> chains.get(c.mediaId());
+            case ClipItem c -> producerOfItem.getOrDefault(c.id(), chains.get(c.mediaId()));
             case TitleItem t -> titleProducerIds.get(t.id());
         };
         Element e = Xml.el(playlist, "entry", "in", clock(pl.in()), "out", clock(pl.outInclusive()),
@@ -481,6 +485,9 @@ public final class KdenliveWriter {
 
     /** trackKind null = bin copy. */
     private String writeMediaProducer(MediaClip m, TrackKind trackKind) {
+        if (m.kind() == MediaKind.COLOR) {
+            return writeColorProducer(m, trackKind);
+        }
         MediaInfo info = m.info();
         boolean image = info.stillImage();
         long length = image ? fps.frames(5) : Math.max(1, m.lengthFrames(fps));
@@ -551,6 +558,67 @@ public final class KdenliveWriter {
         } else {
             Xml.prop(c, "kdenlive:monitorPosition", 0);
         }
+        return id;
+    }
+
+    /** A Kdenlive color clip (layout of Kdenlive's own, see tests/dataset/test-missing.kdenlive). */
+    private String writeColorProducer(MediaClip m, TrackKind trackKind) {
+        String id = "producer" + producerN++;
+        long len = fps.frames(5);
+        Element e = Xml.el(mlt, "producer", "id", id, "in", clock(0), "out", clock(len - 1));
+        Xml.prop(e, "length", 2147483647);
+        Xml.prop(e, "eof", "pause");
+        Xml.prop(e, "resource", m.color());
+        Xml.prop(e, "aspect_ratio", 1);
+        Xml.prop(e, "mlt_service", "color");
+        Xml.prop(e, "kdenlive:clipname", m.name());
+        Xml.prop(e, "kdenlive:duration", MltTime.timecode(len, fps));
+        Xml.prop(e, "kdenlive:folderid", -1);
+        Xml.prop(e, "kdenlive:id", m.binId());
+        Xml.prop(e, "mlt_image_format", "rgba");
+        Xml.prop(e, "kdenlive:clip_type", clipType(MediaKind.COLOR));
+        Xml.prop(e, "kdenlive:control_uuid", m.extras().properties().getOrDefault("kdenlive:control_uuid", controlUuid(m)));
+        m.extras().properties().forEach((k, v) -> {
+            if (k.startsWith("kdenlive:") && !k.equals("kdenlive:control_uuid") && !k.equals("kdenlive:clip_type")
+                    && !k.equals("kdenlive:duration") && !k.equals("kdenlive:folderid") && !k.equals("kdenlive:file_hash")) {
+                Xml.prop(e, k, v);
+            }
+        });
+        if (trackKind == TrackKind.VIDEO) {
+            Xml.prop(e, "set.test_audio", 1);
+            Xml.prop(e, "set.test_image", 0);
+        }
+        return id;
+    }
+
+    /**
+     * A speed-changed clip gets its own timewarp producer, as Kdenlive does (ProjectClip::getTimelineProducer):
+     * resource "speed:path", length = media length / speed, entry in/out in the retimed frames.
+     */
+    private String writeTimewarpProducer(MediaClip m, TrackKind trackKind, ClipItem c) {
+        String id = "producer" + producerN++;
+        long length = Math.max(1, (long) Math.floor(Math.max(1, m.lengthFrames(fps)) / c.speed()));
+        String speed = dev.kdenlivemcp.assets.ParamCodec.num(c.speed()); // QString::number(speed, 'g', 15)
+        String path = m.path().toAbsolutePath().normalize().toString();
+        Element e = Xml.el(mlt, "producer", "id", id, "in", clock(0), "out", clock(length - 1));
+        Xml.prop(e, "length", length);
+        Xml.prop(e, "eof", "pause");
+        Xml.prop(e, "resource", speed + ":" + path);
+        Xml.prop(e, "warp_speed", speed);
+        Xml.prop(e, "warp_resource", path);
+        Xml.prop(e, "warp_pitch", c.keepPitch() ? 1 : 0);
+        Xml.prop(e, "mlt_service", "timewarp");
+        boolean audioOnly = m.kind() == MediaKind.AUDIO;
+        Xml.prop(e, "audio_index", m.kind().hasAudio() ? (m.kind() == MediaKind.AV ? 1 : 0) : -1);
+        Xml.prop(e, "video_index", m.kind().hasVideo() && !audioOnly ? 0 : -1);
+        Xml.prop(e, "seekable", 1);
+        Xml.prop(e, "kdenlive:id", m.binId());
+        Xml.prop(e, "kdenlive:control_uuid", m.extras().properties().getOrDefault("kdenlive:control_uuid", controlUuid(m)));
+        Xml.prop(e, "kdenlive:clip_type", clipType(m.kind()));
+        Xml.prop(e, "kdenlive:clipname", m.name());
+        Xml.prop(e, "xml", "was here");
+        Xml.prop(e, "set.test_audio", trackKind == TrackKind.AUDIO ? 0 : 1);
+        Xml.prop(e, "set.test_image", trackKind == TrackKind.VIDEO ? 0 : 1);
         return id;
     }
 
@@ -641,6 +709,11 @@ public final class KdenliveWriter {
         Xml.prop(seq, "kdenlive:sequenceproperties.groups", groupsJson());
         Xml.prop(seq, "kdenlive:sequenceproperties.guides",
                 seqExtras.getOrDefault("kdenlive:sequenceproperties.guides", "[\n]\n"));
+        if (!p.subtitles().isEmpty()) {
+            seqExtras.putIfAbsent("kdenlive:sequenceproperties.subtitlesList", "[\n    {\n        \"file\": \""
+                    + subtitleFile(p.file()).toString().replace("\\", "/") + "\",\n        \"id\": 0,\n        \"name\": "
+                    + "\"Subtitles\"\n    }\n]\n");
+        }
         seqExtras.forEach((k, v) -> {
             if (!k.equals("kdenlive:clipname") && !k.equals("kdenlive:sequenceproperties.guides")) {
                 Xml.prop(seq, k, v);
@@ -679,6 +752,28 @@ public final class KdenliveWriter {
         p.meta().extras().xml().forEach(x -> Xml.appendFragment(seq, renumber(x)));
         internalAudioFilters(seq, false);
         p.masterEffects().forEach(fx -> writeEffect(seq, fx));
+        writeSubtitles(seq);
+    }
+
+    /** Kdenlive's subtitle track: {@code <project>.kdenlive.ass} next to the project and an internal filter. */
+    private void writeSubtitles(Element seq) {
+        if (p.subtitles().isEmpty()) {
+            return;
+        }
+        Path ass = subtitleFile(p.file());
+        titleFiles.put(ass, AssFile.write(p.subtitles(), p.profile(), KDENLIVE_VERSION));
+        Element f = filter(seq, null, null);
+        Xml.prop(f, "av.alpha", 1);
+        Xml.prop(f, "av.filename", ass.toString());
+        p.subtitles().filterProps().forEach((k, v) -> Xml.prop(f, k, v));
+        Xml.prop(f, "mlt_service", "avfilter.subtitles");
+        Xml.prop(f, "internal_added", 237);
+    }
+
+    /** Where Kdenlive keeps the main timeline's subtitles (KdenliveDoc::subTitlePath). */
+    public static Path subtitleFile(Path project) {
+        Path abs = project.toAbsolutePath();
+        return abs.resolveSibling(abs.getFileName() + ".ass");
     }
 
     /**
@@ -871,6 +966,7 @@ public final class KdenliveWriter {
             case AUDIO -> 1;
             case VIDEO -> 2;
             case IMAGE -> 5;
+            case COLOR -> 2; // what Kdenlive stores for color clips
         };
     }
 

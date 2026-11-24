@@ -34,6 +34,19 @@ public final class ProjectOps {
                 DocumentMeta.fresh());
     }
 
+    /** Adds a color clip (Kdenlive's "Add Color Clip") to the bin. */
+    public static EditResult addColor(Project p, String color, String name) {
+        Draft d = new Draft(p);
+        String hex = dev.kdenlivemcp.assets.ParamCodec.color(new dev.kdenlivemcp.assets.AssetParam("color", "color",
+                "Color", "", "", null, null, null, null, 1, null, "", null, null), color);
+        int binId = Math.max(FIRST_BIN_ID, d.bin.stream().mapToInt(MediaClip::binId).max().orElse(FIRST_BIN_ID - 1) + 1);
+        String id = d.newId("m");
+        String label = name == null || name.isBlank() ? "Color " + color.trim() : name.trim();
+        d.bin.add(new MediaClip(id, binId, MediaInfo.color(hex).path(), label, MediaInfo.color(hex), Extras.NONE));
+        return new EditResult(d.build(), id + ": color clip \"" + label + "\" (" + hex + "); place it with clip_insert "
+                + "(out = duration in seconds, default 5)", d.notes, List.of(id));
+    }
+
     /** Adds probed files to the bin. A file already in the bin is not added twice. */
     public static EditResult importMedia(Project p, List<MediaInfo> infos) {
         Draft d = new Draft(p);

@@ -87,8 +87,11 @@ final class Formatters {
                 in.put("type", "clip");
                 in.put("clip", c.mediaId());
                 in.put("name", m == null ? c.mediaId() : m.name());
-                in.put("in", sec(fps, c.in()));
-                in.put("out", sec(fps, c.out()));
+                in.put("in", sec(fps, c.sourceInFrames()));
+                in.put("out", sec(fps, c.sourceOutFrames()));
+                if (c.speedChanged()) {
+                    in.put("speed", c.speed());
+                }
                 if (c.linkId() != null) {
                     in.put("link", c.linkId());
                 }

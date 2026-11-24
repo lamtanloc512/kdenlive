@@ -254,7 +254,7 @@ public final class ParamCodec {
     }
 
     /** "#RRGGBB", "#RRGGBBAA", "0xRRGGBBAA" or a basic color name -> Kdenlive's "0xRRGGBBAA". */
-    static String color(AssetParam p, Object value) {
+    public static String color(AssetParam p, Object value) {
         String s = value.toString().trim();
         String hex;
         if (NAMED_COLORS.containsKey(s.toLowerCase(Locale.ROOT))) {

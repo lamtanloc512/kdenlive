@@ -152,8 +152,8 @@ MELT_PATH=~/.kdenlive-mcp/tools/bin/melt ./mvnw verify
 
 * **No ripple editing.** Items never overlap; an insert or move into an occupied spot is refused, and the error gives the next free position.
 * **One sequence per project.** Projects with several sequences are refused when opened.
-* **Bin clips:** video/audio files and titles (still images are supported but only lightly tested). Color clips, slideshows, nested sequences and proxies are
-  refused when opened.
+* **Bin clips:** video/audio files, images, color clips and titles. Slideshows, other generators, nested sequences and
+  proxies are refused when opened. Reverse speed and time remapping are not modelled (a reversed clip plays forward).
 * **Effects:** every effect in Kdenlive's catalog can be added, set, keyframed and reordered on items, tracks and the
   master (see docs/tools.md). Effects made in Kdenlive are editable too. Complex parameter types (curves, splines,
   roto masks, gradients) take Kdenlive's raw string format. The Linux tools archive still has only the MLT modules of

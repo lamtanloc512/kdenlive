@@ -1,6 +1,8 @@
 package dev.kdenlivemcp.edit;
 
 import dev.kdenlivemcp.model.ClipItem;
+import dev.kdenlivemcp.model.Subtitles;
+import dev.kdenlivemcp.model.DocumentMeta;
 import dev.kdenlivemcp.model.EditException;
 import dev.kdenlivemcp.model.Effect;
 import dev.kdenlivemcp.model.Fps;
@@ -32,6 +34,8 @@ final class Draft {
     /** Track shells (items live in {@link #items}); mutable so tracks can be added, renamed and flagged. */
     final List<Track> tracks;
     final List<Effect> masterEffects;
+    DocumentMeta meta;
+    Subtitles subtitles;
     private long nextId;
 
     record Located(Track track, TimelineItem item) {
@@ -46,6 +50,8 @@ final class Draft {
         this.transitions = new ArrayList<>(p.transitions());
         this.tracks = new ArrayList<>(p.tracks());
         this.masterEffects = new ArrayList<>(p.masterEffects());
+        this.meta = p.meta();
+        this.subtitles = p.subtitles();
         this.nextId = p.nextId();
     }
 
@@ -347,7 +353,7 @@ final class Draft {
 
     Project build() {
         List<Track> built = tracks.stream().map(t -> t.withItems(items.get(t.id()))).toList();
-        return new Project(base.file(), base.profile(), bin, built, transitions, nextId, base.meta(), masterEffects);
+        return new Project(base.file(), base.profile(), bin, built, transitions, nextId, meta, masterEffects, subtitles);
     }
 
     static String abbreviate(String s) {

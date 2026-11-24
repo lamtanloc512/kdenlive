@@ -245,6 +245,31 @@ composition_add(type="slide", track="V2", at=6, duration=2, params={"rect":{"fro
 
 ### `composition_set(compositionId, params?, keyframes?, at?, duration?, withTrack?)` / `composition_remove(compositionId)`
 
+## Speed, color clips, subtitles, guides
+
+### `clip_speed(itemId, speed, keepPitch=false)`
+Kdenlive's Change Speed (timewarp): 0.5 = half speed, 2 = double. The clip keeps its start and the same source
+range, so its length changes; the linked part follows and effect keyframes stay on the same pictures. In/out in
+`timeline_get` and `clip_trim` stay in source seconds.
+```
+clip_speed(itemId="c5", speed=0.5, keepPitch=true)
+→ speed of c5 (clipA.mp4) set to 50% (pitch kept): now 2.000–6.000 (4.000s, was 2.000s); linked c6 too
+```
+
+### `media_add_color(color, name?)`
+A color clip in the bin (backgrounds, title cards); place it with `clip_insert(..., out=<seconds>)`.
+
+### `subtitle_add(start, end, text)` / `subtitle_list()` / `subtitle_set(number, ...)` / `subtitle_remove(number?)`
+Kdenlive's subtitle track: `<project>.kdenlive.ass` next to the project plus its internal subtitle filter, so
+Kdenlive shows the lines on its Subtitles track and renders burn them in.
+
+### `subtitle_import(path, offset=0, replace=false)` / `subtitle_style(font, size, color, outlineColor, outline, bold, position, marginV, box, backColor)`
+Import .srt/.vtt/.ass (e.g. a speech-to-text transcript). The style is the Default ASS style.
+
+### `marker_add(at, comment?, category=0, duration=0, clipId?)` / `marker_list(clipId?)` / `marker_remove(at?, clipId?)`
+Timeline guides (Kdenlive's Guides) or, with `clipId`, markers on a bin clip. Categories 0..8 are Kdenlive's
+colors (purple, blue, cyan, green, yellow, orange, dark orange, red-orange, red).
+
 ## Tracks
 
 ### `track_add(kind, name?)` / `track_set(track, muted?, hidden?, locked?, name?)` / `track_remove(track)`

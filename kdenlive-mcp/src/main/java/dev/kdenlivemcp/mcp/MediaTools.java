@@ -52,6 +52,9 @@ public class MediaTools {
             if (count < 2 || count > 24) {
                 throw new EditException("count must be between 2 and 24");
             }
+            if (m.info().isColor()) {
+                throw new EditException(m.label() + " is a color clip (" + m.color() + "): nothing to preview");
+            }
             double dur = m.info().stillImage() ? 0 : m.info().durationSeconds();
             double last = Math.max(0, dur - 0.05);
             double s = start == null ? 0 : start;

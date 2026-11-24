@@ -28,6 +28,11 @@ public record MediaClip(String id, int binId, Path path, String name, MediaInfo 
         return info.stillImage() ? Long.MAX_VALUE / 4 : fps.framesFloor(info.durationSeconds());
     }
 
+    /** Kdenlive color string (0xRRGGBBAA) of a color clip. */
+    public String color() {
+        return path.toString().substring("color:".length());
+    }
+
     public String label() {
         return id + " (" + name + ")";
     }

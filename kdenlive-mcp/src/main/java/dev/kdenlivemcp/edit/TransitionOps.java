@@ -264,7 +264,8 @@ public final class TransitionOps {
             case TitleItem t -> UNLIMITED;
             case ClipItem c -> {
                 MediaClip m = d.media(c.mediaId());
-                yield m.info().stillImage() ? UNLIMITED : Math.max(0, m.lengthFrames(d.fps()) - c.out());
+                yield m.info().stillImage() ? UNLIMITED
+                        : Math.max(0, (long) Math.floor(m.lengthFrames(d.fps()) / c.speed()) - c.out());
             }
         };
     }
