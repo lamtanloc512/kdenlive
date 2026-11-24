@@ -1,23 +1,15 @@
 # Reference projects (please create these in Kdenlive)
 
 These files are how we learn exactly what your Kdenlive writes. Please save them **from Kdenlive itself**
-and don't edit them by hand. Use **Kdenlive 25.x** on your Mac and note the exact version (Help → About Kdenlive).
+and don't edit them by hand. Use the Kdenlive on your Mac (26.08.3 is the latest release) and note the exact version (Help → About Kdenlive).
 
 ## Shared setup
 
-1. Make a folder `fixtures/media/` and put three tiny clips in it. You can generate them with:
-
-```bash
-ffmpeg -f lavfi -i "smptebars=size=1920x1080:rate=30" -f lavfi -i "sine=frequency=440:sample_rate=48000" -t 6 -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest fixtures/media/bars.mp4
-```
-
-```bash
-ffmpeg -f lavfi -i "testsrc2=size=1920x1080:rate=30" -f lavfi -i "sine=frequency=660:sample_rate=48000" -t 6 -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest fixtures/media/testsrc.mp4
-```
-
-```bash
-ffmpeg -f lavfi -i "sine=frequency=220:sample_rate=48000" -t 12 -c:a aac fixtures/media/music.m4a
-```
+1. Unzip `fixture-kit.zip` here, so you have `fixtures/media/` with three clips cut from your demo
+   recording (scaled and padded to 1920x1080 @ 30 fps, so Kdenlive won't ask to change the profile):
+   * `demo_a.mp4`: 6 s from 0:30 (the Kyoto prompt), with audio
+   * `demo_b.mp4`: 6 s from 1:00 (the orange "Act" scene), with audio
+   * `music.m4a`: 12 s of the recording's audio from 2:00, audio only
 
 2. New project: Project → Project Settings → **HD 1080p 30 fps**. Keep the default tracks
    (Kdenlive's default is V1, V2, A1, A2; if yours differs, that's fine — just tell me).
@@ -28,8 +20,8 @@ ffmpeg -f lavfi -i "sine=frequency=220:sample_rate=48000" -t 12 -c:a aac fixture
 | File | Contents |
 |---|---|
 | `01-empty.kdenlive` | New project, nothing added. Save. |
-| `02-one-clip.kdenlive` | Add `bars.mp4` to the bin and drag it onto **V1 at 0 s**, keeping its full length (its audio lands on A1). Save. |
-| `03-full.kdenlive` | Put `bars.mp4` on V1 at 0 s and `testsrc.mp4` straight after it (at 6 s). Add a **same-track mix / dissolve** between them: select the cut and press `U` (Timeline → Mix Clips), duration 1 s. Add a **title clip** ("Hello", any font) on V2 at 1 s, 3 s long, with a **fade in** if you can. Put `music.m4a` on **A2** at 0 s (not A1, since the clips' own audio is on A1), lower its volume by 6 dB (Volume effect) and add an audio **fade out** over the last 1 s. Save. |
+| `02-one-clip.kdenlive` | Add `demo_a.mp4` to the bin and drag it onto **V1 at 0 s**, keeping its full length (its audio lands on A1). Save. |
+| `03-full.kdenlive` | Put `demo_a.mp4` on V1 at 0 s and `demo_b.mp4` straight after it (at 6 s). Add a **same-track mix / dissolve** between them: first trim 0.5 s off the end of `demo_a` and the start of `demo_b` (drag the edges) and close the gap, so the mix has spare media; then select the cut and press `U` (Timeline → Mix Clips), duration 1 s. Add a **title clip** ("Hello", any font) on V2 at 1 s, 3 s long, with a **fade in** if you can. Put `music.m4a` on **A2** at 0 s (not A1, since the clips' own audio is on A1), lower its volume by 6 dB (Volume effect) and add an audio **fade out** over the last 1 s. Save. |
 
 ## Optional, but it saves guessing
 
