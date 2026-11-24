@@ -23,10 +23,12 @@ public class TimelineTools {
     private final TitlePresets presets;
     private final KdenliveXmlBackend backend;
     private final dev.kdenlivemcp.assets.AssetCatalog catalog;
+    private final dev.kdenlivemcp.edit.EffectOps.Env env;
 
     public TimelineTools(ProjectSession session, TitlePresets presets, KdenliveXmlBackend backend,
-                         dev.kdenlivemcp.assets.AssetCatalog catalog) {
+                         dev.kdenlivemcp.assets.AssetCatalog catalog, dev.kdenlivemcp.edit.EffectOps.Env env) {
         this.catalog = catalog;
+        this.env = env;
         this.session = session;
         this.presets = presets;
         this.backend = backend;
@@ -150,22 +152,31 @@ public class TimelineTools {
             Add a transition. dissolve / wipe: a same-track mix between two items that touch (itemA ends where \
             itemB starts), like Kdenlive's 'Mix clips'. It needs spare source media around the cut (the error says \
             how much is missing and how to trim). The linked audio parts get a crossfade automatically. On audio \
-            tracks dissolve = crossfade. fade_to_black: fades the end of itemA to black (and its audio out).
+            tracks dissolve = crossfade. wipe takes a shape (any of Kdenlive's wipes: Iris Circle, Clock, Barn Door \
+            Horizontal, Matrix Snake Vertical, Curtain, Spiral, ...). fade_to_black: fades the end of itemA to black \
+            (and its audio out). For transitions between TRACKS (picture-in-picture, slides, blend modes) use \
+            composition_add.
             Examples: transition_add(type="dissolve", itemA="c4", itemB="c6", duration=1.0); \
+            transition_add(type="wipe", itemA="c4", itemB="c6", shape="Iris Circle"); \
             transition_add(type="fade_to_black", itemA="c8", duration=1.5)""")
     public String transitionAdd(
             @ToolArg(description = "dissolve | wipe | fade_to_black") String type,
             @ToolArg(description = "First item (or the faded item)") String itemA,
             @ToolArg(description = "Second item, for dissolve/wipe", required = false) String itemB,
-            @ToolArg(description = "Duration in seconds", defaultValue = "1.0") double duration) {
+            @ToolArg(description = "Duration in seconds", defaultValue = "1.0") double duration,
+            @ToolArg(description = "Wipe shape (Kdenlive name, e.g. \"Iris Circle\", \"Clock\", \"Barn Door Horizontal\"); "
+                    + "wipe only", required = false) String shape) {
         return ToolSupport.call("transition_add", () -> {
             long len = ToolSupport.positive(fps(), "duration", duration);
             String t = type == null ? "" : type.trim().toLowerCase(Locale.ROOT);
             return switch (t) {
                 case "dissolve", "crossfade" -> session.apply("dissolve",
                         p -> TransitionOps.addMix(p, MixType.DISSOLVE, itemA, itemB, len)).message();
-                case "wipe" -> session.apply("wipe", p -> TransitionOps.addMix(p, MixType.WIPE, itemA, itemB, len))
-                        .message();
+                case "wipe" -> {
+                    String luma = shape == null || shape.isBlank() ? null : env.lumas().resolve(shape);
+                    yield session.apply("wipe", p -> TransitionOps.addMix(p, MixType.WIPE, itemA, itemB, len, luma))
+                            .message();
+                }
                 case "fade_to_black" -> session.apply("fade_to_black",
                         p -> TransitionOps.addFadeToBlack(p, itemA, len)).message();
                 default -> throw new EditException("unknown transition type '" + type

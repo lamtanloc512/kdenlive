@@ -135,9 +135,13 @@ final class EffectView {
 
     /** effect_info text: description and every settable parameter with type, range, default and choices. */
     static String info(AssetDef def, boolean available, ParamCodec.Context ctx) {
+        return info(def, available, ctx, null);
+    }
+
+    static String info(AssetDef def, boolean available, ParamCodec.Context ctx, dev.kdenlivemcp.assets.LumaLibrary lumas) {
         StringBuilder sb = new StringBuilder();
         sb.append(def.id()).append(" — ").append(def.name()).append(" [").append(def.audio() ? "audio" : "video")
-                .append(", ").append(def.category()).append("]");
+                .append(def.domain() == AssetDef.Domain.TRANSITION ? " composition" : ", " + def.category()).append("]");
         if (!available) {
             sb.append(" (NOT available in this melt: Kdenlive can use it, previews/renders here skip it)");
         }
@@ -166,7 +170,13 @@ final class EffectView {
                 Object ui = ParamCodec.toUi(ap, dflt);
                 sb.append(" default ").append(ui instanceof Double d ? ParamCodec.num(d) : ui);
             }
-            if (!ap.values().isEmpty()) {
+            if (ParamCodec.isLuma(ap)) {
+                sb.append(" wipe shape by name, \"none\" = plain dissolve")
+                        .append(lumas == null ? "" : "; shapes: " + String.join(", ", lumas.labels()));
+            } else if (ParamCodec.isSlide(ap)) {
+                sb.append(" direction {\"from\": left|right|up|down|center, \"to\": ..., \"fromOpacity\": 0..100, "
+                        + "\"toOpacity\": 0..100}, or \"left>center\"");
+            } else if (!ap.values().isEmpty()) {
                 sb.append(" choices: ").append(ParamCodec.choices(ap));
             }
             if (!ap.comment().isBlank()) {
@@ -188,8 +198,8 @@ final class EffectView {
             case COLOR -> "color #RRGGBB[AA]";
             case RECT -> "rect {x,y,w,h,opacity} px";
             case POINT -> "point {x,y}";
-            case TEXT -> ap.type().toLowerCase(Locale.ROOT);
-            case RAW -> "raw " + ap.type() + " string";
+            case TEXT -> ParamCodec.isLuma(ap) ? "wipe shape" : ap.type().toLowerCase(Locale.ROOT);
+            case RAW -> ParamCodec.isSlide(ap) ? "slide" : "raw " + ap.type() + " string";
             default -> ap.type();
         };
     }

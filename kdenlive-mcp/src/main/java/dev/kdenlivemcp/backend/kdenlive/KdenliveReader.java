@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.kdenlivemcp.media.MediaInfo;
 import dev.kdenlivemcp.model.AudioSettings;
 import dev.kdenlivemcp.model.ClipItem;
+import dev.kdenlivemcp.model.Composition;
 import dev.kdenlivemcp.model.DocumentMeta;
 import dev.kdenlivemcp.model.EditException;
 import dev.kdenlivemcp.model.Effect;
@@ -295,7 +296,7 @@ public final class KdenliveReader {
             b.start = cutPos;
             b.in += cut;
             b.length -= cut;
-            pendingMixes.add(new Object[] {aRaw, b, type, length, cut});
+            pendingMixes.add(new Object[] {aRaw, b, type, length, cut, resource});
         }
 
         // ids
@@ -314,7 +315,7 @@ public final class KdenliveReader {
             long length = (Long) pm[3];
             long cut = (Long) pm[4];
             transitions.add(new Mix(transitionId("mix:" + ra.id), (MixType) pm[2], ra.id, rb.id, length,
-                    Math.min(cut, length)));
+                    Math.min(cut, length), (String) pm[5]));
         }
 
         // items with effects
@@ -353,7 +354,12 @@ public final class KdenliveReader {
         List<String> seqXml = new ArrayList<>();
         for (Element t : Xml.children(seq, "transition")) {
             if (Xml.prop(t, "internal_added") == null) {
-                seqXml.add(Xml.toString(t, false));
+                Composition c = composition(t, names);
+                if (c != null) {
+                    transitions.add(c);
+                } else {
+                    seqXml.add(Xml.toString(t, false));
+                }
             }
         }
         List<Effect> master = new ArrayList<>();
@@ -556,6 +562,31 @@ public final class KdenliveReader {
         } catch (Exception e) {
             return "";
         }
+    }
+
+    // ------------------------------------------------------------------ compositions
+
+    /** A user composition in the sequence, or null when its tracks cannot be resolved (kept as passthrough). */
+    private Composition composition(Element t, List<String> names) {
+        Map<String, String> props = Xml.properties(t);
+        int b = (int) parseLong(props.get("b_track"), -1);
+        int a = (int) parseLong(props.get("a_track"), 0);
+        if (b < 1 || b > names.size() || a < 0 || a > names.size() || props.containsKey("kdenlive:mixcut")
+                || !t.hasAttribute("out")) {
+            return null;
+        }
+        long in = t.hasAttribute("in") ? MltTime.parse(t.getAttribute("in"), fps) : 0;
+        long out = MltTime.parse(t.getAttribute("out"), fps);
+        if (out < in) {
+            return null;
+        }
+        String track = names.get(b - 1);
+        boolean force = "1".equals(props.get("force_track"));
+        props.remove("a_track");
+        props.remove("b_track");
+        props.remove("force_track");
+        return new Composition(transitionId("comp:" + track + "@" + in), track, a == 0 ? null : names.get(a - 1), force,
+                in, out - in + 1, props);
     }
 
     // ------------------------------------------------------------------ effects

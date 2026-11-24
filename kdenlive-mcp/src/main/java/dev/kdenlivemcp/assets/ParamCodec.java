@@ -56,7 +56,22 @@ public final class ParamCodec {
      * @param contentWidth size of the owner's own picture (media size for clips), for %contentWidth
      */
     public record Context(int width, int height, long anchor, long length, int contentWidth, int contentHeight,
-                          LongFunction<String> clock) {
+                          LongFunction<String> clock, LumaLibrary lumas) {
+
+        public Context(int width, int height, long anchor, long length, int contentWidth, int contentHeight,
+                       LongFunction<String> clock) {
+            this(width, height, anchor, length, contentWidth, contentHeight, clock, null);
+        }
+    }
+
+    /** Kdenlive's luma file list placeholder (urllist parameters with paramlist="%lumaPaths"). */
+    public static boolean isLuma(AssetParam p) {
+        return p.values().size() == 1 && "%lumaPaths".equals(p.values().getFirst());
+    }
+
+    /** Slide direction parameters (type="wipe"): 0=start;-1=end rectangles in percent with opacity. */
+    public static boolean isSlide(AssetParam p) {
+        return "wipe".equalsIgnoreCase(p.type());
     }
 
     /** A decoded keyframe: frame in the effect's time base, ease name, raw MLT value. */
@@ -158,7 +173,18 @@ public final class ParamCodec {
             case COLOR -> color(p, value);
             case RECT -> rect(p, value, c);
             case POINT -> point(p, value);
-            case TEXT, RAW -> value instanceof Map<?, ?> || value instanceof List<?> ? json(value) : value.toString();
+            case TEXT, RAW -> {
+                if (isLuma(p)) {
+                    if (c.lumas() == null) {
+                        throw new EditException(p.name() + ": wipe shapes are not available here");
+                    }
+                    yield c.lumas().resolve(value.toString());
+                }
+                if (isSlide(p)) {
+                    yield slide(p, value);
+                }
+                yield value instanceof Map<?, ?> || value instanceof List<?> ? json(value) : value.toString();
+            }
             case FIXED, HIDDEN, POSITION -> throw new EditException(p.name() + " is set by Kdenlive and cannot be changed");
         };
     }
@@ -268,6 +294,44 @@ public final class ParamCodec {
             sb.append(' ').append(num(o));
         }
         return sb.toString();
+    }
+
+    private static final Map<String, String> SLIDE_POS = Map.of("left", "-100% 0% 100% 100%", "right",
+            "100% 0% 100% 100%", "down", "0% 100% 100% 100%", "bottom", "0% 100% 100% 100%", "up", "0% -100% 100% 100%",
+            "top", "0% -100% 100% 100%", "center", "0% 0% 100% 100%");
+
+    /** {from, to, fromOpacity?, toOpacity?} or "left>center" -> Kdenlive's SlideWidget string. */
+    static String slide(AssetParam p, Object value) {
+        String from;
+        String to;
+        Object fo = 100;
+        Object to2 = 100;
+        if (value instanceof Map<?, ?> m) {
+            from = String.valueOf(m.containsKey("from") ? m.get("from") : "center");
+            to = String.valueOf(m.containsKey("to") ? m.get("to") : "center");
+            fo = m.containsKey("fromOpacity") ? m.get("fromOpacity") : 100;
+            to2 = m.containsKey("toOpacity") ? m.get("toOpacity") : 100;
+        } else {
+            String s = value.toString().trim();
+            if (s.contains("=")) {
+                return s; // raw MLT value
+            }
+            String[] parts = s.split("\\s*(>|->|to)\\s*");
+            from = parts[0];
+            to = parts.length > 1 ? parts[1] : "center";
+        }
+        String a = SLIDE_POS.get(from.toLowerCase(Locale.ROOT));
+        String b = SLIDE_POS.get(to.toLowerCase(Locale.ROOT));
+        if (a == null || b == null) {
+            throw new EditException(p.name() + ": directions are left, right, up, down, center; e.g. "
+                    + "{\"from\":\"left\",\"to\":\"center\"} slides in from the left");
+        }
+        return "0=" + a + " " + percent(fo) + "%;-1=" + b + " " + percent(to2) + "%";
+    }
+
+    private static String percent(Object o) {
+        double v = o instanceof Number n ? n.doubleValue() : Double.parseDouble(o.toString().replace("%", "").trim());
+        return num(Math.max(0, Math.min(100, v))); // percent, as Kdenlive's slide widget
     }
 
     private static String point(AssetParam p, Object value) {

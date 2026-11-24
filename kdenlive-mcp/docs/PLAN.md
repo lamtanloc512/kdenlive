@@ -214,7 +214,8 @@ Rendering details:
 * One sequence: we edit the active one and pass the others through untouched.
 * ~~No keyframes and no effects beyond volume/fades/fade-to-black.~~ Done (phase 2a): Kdenlive's whole effect
   catalog with keyframes on items, tracks and the master; tracks can be added/removed; camera moves.
-  Next: compositions between tracks (2b); speed, generators, subtitles, guides (2c).
+  Done (2b): compositions between tracks from Kdenlive's catalog, wipe shapes. Next (2c): speed, generators,
+  subtitles, guides.
 * Kdenlive doesn't notice when the file changes under it. Reopen the project in Kdenlive after Claude edits it.
 * Proxies, image sequences and variable-frame-rate media are untested. VFR may drift (we warn on import).
 * Rotation metadata is reported by `media_import`, but we don't auto-correct it.

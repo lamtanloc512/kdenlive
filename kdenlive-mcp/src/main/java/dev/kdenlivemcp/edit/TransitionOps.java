@@ -3,6 +3,7 @@ package dev.kdenlivemcp.edit;
 import dev.kdenlivemcp.edit.Draft.Located;
 import dev.kdenlivemcp.model.AudioSettings;
 import dev.kdenlivemcp.model.ClipItem;
+import dev.kdenlivemcp.model.Composition;
 import dev.kdenlivemcp.model.EditException;
 import dev.kdenlivemcp.model.FadeToBlack;
 import dev.kdenlivemcp.model.MediaClip;
@@ -30,6 +31,11 @@ public final class TransitionOps {
     }
 
     public static EditResult addMix(Project p, MixType type, String itemA, String itemB, long length) {
+        return addMix(p, type, itemA, itemB, length, null);
+    }
+
+    /** @param luma wipe shape for WIPE (built-in name or file path from LumaLibrary), null = Kdenlive's default */
+    public static EditResult addMix(Project p, MixType type, String itemA, String itemB, long length, String luma) {
         Draft d = new Draft(p);
         Located a = d.locate(itemA);
         String name = type.name().toLowerCase();
@@ -64,6 +70,9 @@ public final class TransitionOps {
             throw new EditException("wipe is video-only; use dissolve for an audio crossfade on " + track);
         }
         Mix mix = planMix(d, type, a.item(), b.item(), length, d.newId("x"));
+        if (type == MixType.WIPE && luma != null && !luma.isBlank()) {
+            mix = new Mix(mix.id(), type, mix.itemA(), mix.itemB(), mix.length(), mix.cutOffset(), luma);
+        }
         d.transitions.add(mix);
         List<String> ids = new ArrayList<>(List.of(mix.id()));
         String summary = "added " + name + " " + mix.id() + " between " + a.item().id() + " and " + b.item().id()
@@ -184,6 +193,8 @@ public final class TransitionOps {
             String problem = switch (t) {
                 case Mix m -> mixProblem(d, m);
                 case FadeToBlack f -> d.find(f.itemId()).isEmpty() ? "item " + f.itemId() + " no longer exists" : null;
+                case Composition c -> d.tracks.stream().anyMatch(x -> x.id().equals(c.track())) ? null
+                        : "track " + c.track() + " no longer exists";
             };
             if (problem != null) {
                 it.remove();
@@ -225,6 +236,7 @@ public final class TransitionOps {
         return switch (t) {
             case Mix m -> rightPartOf.containsKey(m.itemA()) ? m.withItems(rightPartOf.get(m.itemA()), m.itemB()) : m;
             case FadeToBlack f -> rightPartOf.containsKey(f.itemId()) ? f.withItem(rightPartOf.get(f.itemId())) : f;
+            case Composition c -> c;
         };
     }
 
@@ -272,6 +284,7 @@ public final class TransitionOps {
         return switch (t) {
             case Mix m -> m.type().name().toLowerCase();
             case FadeToBlack f -> "fade_to_black";
+            case Composition c -> "composition " + c.assetId();
         };
     }
 }

@@ -1,5 +1,6 @@
 package dev.kdenlivemcp.edit;
 
+import dev.kdenlivemcp.model.Composition;
 import dev.kdenlivemcp.model.EditException;
 import dev.kdenlivemcp.model.Extras;
 import dev.kdenlivemcp.model.Project;
@@ -104,6 +105,9 @@ public final class TrackOps {
         }
         d.tracks.remove(t);
         d.items.remove(t.id());
+        // compositions onto the removed track fall back to the background
+        d.transitions.replaceAll(x -> x instanceof Composition c && t.id().equals(c.withTrack())
+                ? c.withTracks(c.track(), null, true) : x);
         TransitionOps.prune(d);
         Map<String, String> renames = renumber(d);
         String summary = "removed track " + t.id()
@@ -132,6 +136,10 @@ public final class TrackOps {
         }
         d.items.clear();
         d.items.putAll(newItems);
+        d.transitions.replaceAll(x -> x instanceof Composition c
+                ? c.withTracks(renames.getOrDefault(c.track(), c.track()),
+                c.withTrack() == null ? null : renames.getOrDefault(c.withTrack(), c.withTrack()), c.forceTrack())
+                : x);
         return renames;
     }
 

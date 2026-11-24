@@ -38,6 +38,9 @@ public class Beans {
     @Produces
     @Singleton
     EffectOps.Env effectEnv(AssetCatalog catalog, ExternalTools tools) {
-        return new EffectOps.Env(catalog, service -> tools.mltCapabilities().has("filters", service));
+        return new EffectOps.Env(catalog, service -> tools.mltCapabilities().has("filters", service),
+                service -> tools.mltCapabilities().has("transitions", service),
+                dev.kdenlivemcp.assets.LumaLibrary.discover(tools.find(dev.kdenlivemcp.tools.Binary.MELT)
+                        .map(dev.kdenlivemcp.tools.ResolvedBinary::path).orElse(null)));
     }
 }

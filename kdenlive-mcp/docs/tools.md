@@ -220,6 +220,31 @@ clip_transform(target="c4", keyframes=[{"t":0,"zoom":1},{"t":"end","zoom":1.3,"x
 → camera move on c4 (Transform e10): 0.000s zoom 1 at (0.5, 0.5) → 5.967s zoom 1.3 at (0.7, 0.4) ease_in_out
 ```
 
+## Compositions (transitions between tracks)
+
+Kdenlive's Compositions panel: a track combined with a lower one (or the black background) over a time span. All
+of Kdenlive's compositions are available (`composition_catalog`): wipe and dissolve with any of Kdenlive's wipe shapes,
+slide, Composite and transform (`qtblend`: picture-in-picture, scale, opacity, blend modes), region, affine, Cairo
+blend and the frei0r blend modes. Keyframe times are seconds from the composition start. Same-track wipes
+(`transition_add(type="wipe")`) take a `shape` too.
+
+### `composition_catalog(query?)` / `composition_info(type)`
+`composition_info` lists parameters and, for wipes, every shape by Kdenlive's name (Iris Circle, Clock, Barn Door
+Horizontal, Matrix Snake Vertical, Curtain, Spiral, ...).
+
+### `composition_add(type, track, at, duration, withTrack?, params?, keyframes?)`
+`track` is the upper track; `withTrack` the lower one (default: the next video track below, `background` = black).
+Slides take `{"from": left|right|up|down|center, "to": ..., "fromOpacity": 0..100, "toOpacity": 0..100}`.
+```
+composition_add(type="wipe", track="V2", at=1, duration=2, params={"luma":"Iris Circle","softness":10})
+→ added composition x6 Wipe (wipe) on V2 over V1, 1.000–3.000: luma=luma16.pgm; softness=10.0
+composition_add(type="qtblend", track="V2", at=4, duration=2, keyframes=[{"t":0,"rect":{"x":1240,"y":60,"w":640,"h":360}},
+    {"t":"end","rect":{"x":60,"y":660,"w":640,"h":360,"opacity":0.6},"ease":"ease_in_out"}])
+composition_add(type="slide", track="V2", at=6, duration=2, params={"rect":{"from":"right","to":"center"}})
+```
+
+### `composition_set(compositionId, params?, keyframes?, at?, duration?, withTrack?)` / `composition_remove(compositionId)`
+
 ## Tracks
 
 ### `track_add(kind, name?)` / `track_set(track, muted?, hidden?, locked?, name?)` / `track_remove(track)`

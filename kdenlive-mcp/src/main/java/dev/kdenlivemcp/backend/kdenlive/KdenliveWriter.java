@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.kdenlivemcp.media.MediaInfo;
 import dev.kdenlivemcp.media.MediaKind;
 import dev.kdenlivemcp.model.ClipItem;
+import dev.kdenlivemcp.model.Composition;
 import dev.kdenlivemcp.model.Effect;
 import dev.kdenlivemcp.model.FadeToBlack;
 import dev.kdenlivemcp.model.Fps;
@@ -440,7 +441,7 @@ public final class KdenliveWriter {
             Xml.prop(t, "reverse", reverse);
         } else {
             Xml.prop(t, "factory", "loader");
-            Xml.prop(t, "resource", m.type() == MixType.WIPE ? "%luma01.pgm" : null);
+            Xml.prop(t, "resource", m.type() == MixType.WIPE ? m.luma() : null);
             Xml.prop(t, "mlt_service", "luma");
             Xml.prop(t, "kdenlive_id", "luma");
             Xml.prop(t, "kdenlive:mixcut", m.cutOffset());
@@ -647,6 +648,7 @@ public final class KdenliveWriter {
         });
         Xml.el(seq, "track", "producer", blackId);
         tractors.forEach(t -> Xml.el(seq, "track", "producer", t));
+        writeCompositions(seq, bottomUp);
         for (int i = 0; i < bottomUp.size(); i++) {
             Element t = Xml.el(seq, "transition", "id", "transition" + transitionN++);
             Xml.prop(t, "a_track", 0);
@@ -677,6 +679,34 @@ public final class KdenliveWriter {
         p.meta().extras().xml().forEach(x -> Xml.appendFragment(seq, renumber(x)));
         internalAudioFilters(seq, false);
         p.masterEffects().forEach(fx -> writeEffect(seq, fx));
+    }
+
+    /**
+     * User compositions, planted before the internal track compositing and in Kdenlive's order
+     * (TimelineModel::replantCompositions: a_track descending, then b_track ascending).
+     */
+    private void writeCompositions(Element seq, List<Track> bottomUp) {
+        Map<String, Integer> index = new HashMap<>();
+        for (int i = 0; i < bottomUp.size(); i++) {
+            index.put(bottomUp.get(i).id(), i + 1);
+        }
+        List<Composition> comps = p.transitions().stream().filter(t -> t instanceof Composition).map(t -> (Composition) t)
+                .filter(c -> index.containsKey(c.track()))
+                .sorted(Comparator.comparingInt((Composition c) -> -aTrack(c, index))
+                        .thenComparingInt(c -> index.get(c.track())).thenComparingLong(Composition::start))
+                .toList();
+        for (Composition c : comps) {
+            Element t = Xml.el(seq, "transition", "id", "transition" + transitionN++, "in", clock(c.start()),
+                    "out", clock(c.end() - 1));
+            Xml.prop(t, "a_track", aTrack(c, index));
+            Xml.prop(t, "b_track", index.get(c.track()));
+            c.props().forEach((k, v) -> Xml.prop(t, k, v));
+            Xml.prop(t, "force_track", c.forceTrack() ? 1 : 0);
+        }
+    }
+
+    private static int aTrack(Composition c, Map<String, Integer> index) {
+        return c.withTrack() == null ? 0 : index.getOrDefault(c.withTrack(), 0);
     }
 
     private String groupsJson() {
@@ -810,6 +840,7 @@ public final class KdenliveWriter {
             switch (t) {
                 case Mix m -> transitions.put("mix:" + m.itemA(), m.id());
                 case FadeToBlack f -> transitions.put("fade:" + f.itemId(), f.id());
+                case Composition c -> transitions.put("comp:" + c.track() + "@" + c.start(), c.id());
             }
         }
         return root.toString();

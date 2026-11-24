@@ -132,6 +132,14 @@ final class Formatters {
                 tn.put("item", f.itemId());
                 tn.put("duration", sec(fps, f.length()));
             }
+            case dev.kdenlivemcp.model.Composition c -> {
+                tn.put("type", "composition");
+                tn.put("composition", c.assetId());
+                tn.put("track", c.track());
+                tn.put("with", c.withTrack() == null ? "background" : c.withTrack());
+                tn.put("start", sec(fps, c.start()));
+                tn.put("end", sec(fps, c.end()));
+            }
         }
     }
 
@@ -178,6 +186,10 @@ final class Formatters {
                             m.type().name().toLowerCase(Locale.ROOT), m.itemA(), m.itemB(), fps.seconds(m.length()));
                     case FadeToBlack f -> String.format(Locale.ROOT, "%s fade_to_black on %s, %.3fs", f.id(), f.itemId(),
                             fps.seconds(f.length()));
+                    case dev.kdenlivemcp.model.Composition c -> String.format(Locale.ROOT,
+                            "%s composition %s on %s over %s %.3f–%.3f", c.id(), c.assetId(), c.track(),
+                            c.withTrack() == null ? "background" : c.withTrack(), fps.seconds(c.start()),
+                            fps.seconds(c.end()));
                 }).append('\n');
             }
         }

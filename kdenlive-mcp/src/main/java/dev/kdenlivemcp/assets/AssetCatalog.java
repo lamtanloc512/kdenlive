@@ -46,6 +46,7 @@ public final class AssetCatalog {
         // Kdenlive never registers excluded MLT services, so their XML definitions are unusable there too
         Set<String> excludedEffects = Set.copyOf(lines(read(cl, ROOT + "excluded_effects.txt")));
         Set<String> excludedTransitions = Set.copyOf(lines(read(cl, ROOT + "excluded_transitions.txt")));
+        Set<String> hiddenTransitions = Set.copyOf(lines(read(cl, ROOT + "hidden_transitions.txt")));
         Map<String, AssetDef> effects = new LinkedHashMap<>();
         Map<String, AssetDef> transitions = new LinkedHashMap<>();
         for (String file : index.split("\\R")) {
@@ -61,7 +62,8 @@ public final class AssetCatalog {
                 if (domain == AssetDef.Domain.EFFECT && (hidden.contains(def.id()) || excludedEffects.contains(def.service()))) {
                     continue;
                 }
-                if (domain == AssetDef.Domain.TRANSITION && excludedTransitions.contains(def.service())) {
+                if (domain == AssetDef.Domain.TRANSITION && (excludedTransitions.contains(def.service())
+                        || hiddenTransitions.contains(def.id()))) {
                     continue;
                 }
                 Map<String, AssetDef> target = domain == AssetDef.Domain.EFFECT ? effects : transitions;
@@ -98,6 +100,23 @@ public final class AssetCatalog {
             String hay = (d.id() + " " + d.name() + " " + d.description() + " " + d.category()).toLowerCase(Locale.ROOT);
             return words.stream().allMatch(hay::contains);
         }).toList();
+    }
+
+    /** Compositions matching a free-text query. */
+    public List<AssetDef> searchTransitions(String query, Predicate<AssetDef> filter) {
+        List<String> words = query == null ? List.of()
+                : List.of(query.toLowerCase(Locale.ROOT).trim().split("\\s+")).stream().filter(w -> !w.isBlank()).toList();
+        return transitions().stream().filter(filter).filter(d -> {
+            String hay = (d.id() + " " + d.name() + " " + d.description()).toLowerCase(Locale.ROOT);
+            return words.stream().allMatch(hay::contains);
+        }).toList();
+    }
+
+    public List<String> suggestTransitions(String id, int max) {
+        String q = id == null ? "" : id.toLowerCase(Locale.ROOT).trim();
+        return transitions.values().stream()
+                .sorted(Comparator.comparingInt((AssetDef d) -> score(q, d)).thenComparing(AssetDef::id))
+                .limit(max).map(AssetDef::id).toList();
     }
 
     /** Up to {@code max} effect ids close to a misspelled one. */

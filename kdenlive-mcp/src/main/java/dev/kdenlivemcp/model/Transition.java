@@ -1,7 +1,7 @@
 package dev.kdenlivemcp.model;
 
 /** Transitions supported in v1. */
-public sealed interface Transition permits Mix, FadeToBlack {
+public sealed interface Transition permits Mix, FadeToBlack, Composition {
 
     String id();
 

@@ -75,7 +75,7 @@ class EndToEndToolsTest {
         assertThat(timeline.clipInsert("m1", "V1", 0, 0.0, 5.0, true)).contains("inserted c4", "audio part c5 on A1");
         assertThat(timeline.clipInsert("m2", "V1", 5, 1.0, 6.0, true)).contains("inserted c6");
         assertThat(timeline.titleAdd("Hello", 0.5, 3, "V2", "lower_third")).contains("added title t8");
-        assertThat(timeline.transitionAdd("dissolve", "c4", "c6", 1.0)).contains("added dissolve", "audio crossfade");
+        assertThat(timeline.transitionAdd("dissolve", "c4", "c6", 1.0, null)).contains("added dissolve", "audio crossfade");
         assertThat(timeline.clipInsert("m3", "A2", 0, null, 10.0, true)).contains("inserted c11 on A2 0.000–10.000");
         assertThat(timeline.audioSet("c11", -12.0, 0.5, 1.0)).contains("volume -12.0 dB");
 

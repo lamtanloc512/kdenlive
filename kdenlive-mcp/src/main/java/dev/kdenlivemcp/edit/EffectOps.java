@@ -40,7 +40,12 @@ public final class EffectOps {
     }
 
     /** What EffectOps needs from the server: the catalog and which MLT services this melt has. */
-    public record Env(AssetCatalog catalog, Predicate<String> serviceAvailable) {
+    public record Env(AssetCatalog catalog, Predicate<String> serviceAvailable, Predicate<String> transitionAvailable,
+                      dev.kdenlivemcp.assets.LumaLibrary lumas) {
+
+        public Env(AssetCatalog catalog, Predicate<String> serviceAvailable) {
+            this(catalog, serviceAvailable, serviceAvailable, new dev.kdenlivemcp.assets.LumaLibrary(List.of()));
+        }
     }
 
     private EffectOps() {
@@ -58,7 +63,7 @@ public final class EffectOps {
             throw new EditException(def.name() + " (" + def.id() + ") can be used once per item and "
                     + owner.label() + " already has it; change it with effect_set");
         }
-        ParamCodec.Context ctx = context(d, owner);
+        ParamCodec.Context ctx = context(d, owner, env);
         Map<String, String> props = new LinkedHashMap<>();
         Long[] inOut = new Long[2];
         for (AssetParam ap : def.params()) {
@@ -128,7 +133,7 @@ public final class EffectOps {
         List<String> changes = new ArrayList<>();
         Effect fx = ref.effect();
         if (hasValues) {
-            fx = apply(d, fx, def, ref.owner(), context(d, ref.owner()), params, keys, changes);
+            fx = apply(d, fx, def, ref.owner(), context(d, ref.owner(), env), params, keys, changes);
         }
         if (enabled != null && enabled == fx.disabled()) {
             fx = fx.withDisabled(!enabled);
@@ -174,14 +179,26 @@ public final class EffectOps {
     /** Applies static values, then keyframes, to an effect. */
     static Effect apply(Draft d, Effect fx, AssetDef def, Owner owner, ParamCodec.Context ctx, Map<String, Object> params,
                         List<KeySpec> keys, List<String> changes) {
-        Map<String, String> props = new LinkedHashMap<>(fx.props());
-        Fps fps = d.fps();
+        return fx.withProps(applyValues(d.fps(), fx.props(), def, owner.label(), owner.start(), owner.anchor(),
+                owner.length(), ctx, params, keys, changes));
+    }
+
+    /**
+     * Applies client values to an asset's properties (effects and compositions).
+     *
+     * @param start timeline frame of the owner start (for messages)
+     * @param anchor owner start in the asset's keyframe time base
+     */
+    static Map<String, String> applyValues(Fps fps, Map<String, String> original, AssetDef def, String label, long start,
+                                           long anchor, long length, ParamCodec.Context ctx, Map<String, Object> params,
+                                           List<KeySpec> keys, List<String> changes) {
+        Map<String, String> props = new LinkedHashMap<>(original);
         if (params != null) {
             for (Map.Entry<String, Object> e : params.entrySet()) {
                 AssetParam ap = param(def, e.getKey());
                 String raw = ParamCodec.toRaw(ap, e.getValue(), ctx);
                 if (ap.animated() && ap.kind() != AssetParam.Kind.RAW) {
-                    raw = ctx.clock().apply(owner.anchor()) + "=" + raw;
+                    raw = ctx.clock().apply(anchor) + "=" + raw;
                 }
                 putParam(props, ap, raw);
                 changes.add(ap.name() + "=" + ParamCodec.toUi(ap, ParamCodec.toRaw(ap, e.getValue(), ctx)));
@@ -193,12 +210,12 @@ public final class EffectOps {
                 if (k.values() == null || k.values().isEmpty()) {
                     throw new EditException("keyframe at " + fps.sec(k.offset()) + "s has no values");
                 }
-                long off = k.offset() < 0 ? owner.length() + k.offset() : k.offset();
-                if (off < 0 || off > owner.length()) {
-                    throw new EditException("keyframe at " + fps.sec(k.offset()) + "s is outside " + owner.label()
-                            + " (0.." + fps.sec(owner.length()) + "s from its start)");
+                long off = k.offset() < 0 ? length + k.offset() : k.offset();
+                if (off < 0 || off > length) {
+                    throw new EditException("keyframe at " + fps.sec(k.offset()) + "s is outside " + label
+                            + " (0.." + fps.sec(length) + "s from its start)");
                 }
-                off = Math.min(off, owner.length() - 1);
+                off = Math.min(off, length - 1);
                 String ease = k.ease() == null || k.ease().isBlank() ? "linear" : k.ease();
                 ParamCodec.easeChar(ease); // validates
                 for (Map.Entry<String, Object> e : k.values().entrySet()) {
@@ -208,7 +225,7 @@ public final class EffectOps {
                                 + animatedHint(def));
                     }
                     perParam.computeIfAbsent(ap.name(), n -> new ArrayList<>())
-                            .add(new ParamCodec.Key(owner.anchor() + off, ease, ParamCodec.toRaw(ap, e.getValue(), ctx)));
+                            .add(new ParamCodec.Key(anchor + off, ease, ParamCodec.toRaw(ap, e.getValue(), ctx)));
                 }
             }
             for (Map.Entry<String, List<ParamCodec.Key>> e : perParam.entrySet()) {
@@ -216,11 +233,11 @@ public final class EffectOps {
                 List<ParamCodec.Key> list = dedupe(e.getValue());
                 putParam(props, ap, ParamCodec.encode(list, ctx.clock()));
                 changes.add(ap.name() + " keyframed at " + String.join(", ", list.stream()
-                        .map(k -> fps.sec(owner.start() + k.frame() - owner.anchor()) + "s").toList()));
+                        .map(k -> fps.sec(start + k.frame() - anchor) + "s").toList()));
             }
             alignKeyframes(props, def, fps);
         }
-        return fx.withProps(props);
+        return props;
     }
 
     /**
@@ -340,10 +357,10 @@ public final class EffectOps {
                 + " track; use a " + wanted.name().toLowerCase(Locale.ROOT) + " item/track or master");
     }
 
-    static ParamCodec.Context context(Draft d, Owner o) {
+    static ParamCodec.Context context(Draft d, Owner o, Env env) {
         Fps fps = d.fps();
         return new ParamCodec.Context(d.base.profile().width(), d.base.profile().height(), o.anchor(), o.length(),
-                o.contentWidth(), o.contentHeight(), f -> MltTime.clock(f, fps));
+                o.contentWidth(), o.contentHeight(), f -> MltTime.clock(f, fps), env.lumas());
     }
 
     static String describeOwner(Draft d, Owner o) {
