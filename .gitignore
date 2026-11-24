@@ -1,0 +1,7 @@
+target/
+.idea/
+*.iml
+.vscode/
+.DS_Store
+fixtures/media/*.mp4
+fixtures/media/*.m4a
