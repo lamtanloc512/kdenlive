@@ -1,177 +1,202 @@
-# The .kdenlive format (document version 1.1): what we must read and write
+# The .kdenlive format we generate (document version 1.1, Kdenlive 26.08.3)
 
-> **Status: DRAFT.** Built from Kdenlive's own source (`lamtanloc512/kdenlive`, version 27.03.70 dev:
-> `dev-docs/fileformat.md`, `src/definitions.h`, `src/doc/kdenlivedoc.cpp`) and the test projects in
-> `tests/dataset/`, the newest written by Kdenlive 24.01.95.
-> Anything marked ❓ must be checked against the reference projects in `./fixtures/`
-> (see `fixtures/README.md`) before we generate it.
+**Source of truth:** the fixtures in `fixtures/`, written by **Kdenlive 26.08.3** (official AppImage, MLT 7.43.0).
+They were driven over D-Bus and xdotool in a headless X server, using clips cut from the user's demo recording:
 
-## 1. Facts checked so far
-
-| Fact | Source |
+| Fixture | Made by |
 |---|---|
-| Current document version is `1.1`, patch `1` (`kdenlive:docproperties.version` = `1.1`). Multiple sequences arrived in 23.04. | `kdenlivedoc.cpp:68-71` |
-| On open, Kdenlive runs `DocumentValidator` and upgrades older documents, so a 1.04 file opens in 25.x. We still write 1.1 to avoid the upgrade path. | `documentvalidator.h` |
-| `melt` plays a `.kdenlive` file directly. It ignores the `kdenlive:*` properties and plays the last tractor (the "project tractor"). | Tested here: `melt test-nesting.kdenlive -consumer avformat:out.mp4` gave a 5.0 s file with audio and video |
-| Grabbing one frame works with `melt x.kdenlive in=F out=F -consumer avformat:f.png vcodec=png`. | Tested here |
-| Numbers are written with `LC_NUMERIC="C"` (dot as the decimal separator). Times are written as clock strings `HH:MM:SS.mmm`. Kdenlive also accepts plain frame counts. | All dataset files |
-| `kdenlive:clip_type` / `kdenlive:producer_type` use `ClipType::ProducerType`: 0 Unknown, 1 Audio, 2 Video, 3 AV, 4 Color, 5 Image, 6 Text (title), 11 TextTemplate, 12 QText, 17 Timeline (sequence). | `definitions.h:174` |
-| Title clips are producers with `mlt_service=kdenlivetitle` and the title document in `xmldata`. `melt` renders them through its qt module. | `clipcontroller.cpp:323`, `melt -query producers` |
+| `01-empty.kdenlive` | File → New (HD 1080p 30 fps, 2 video + 2 audio tracks) → Save As |
+| `02-one-clip.kdenlive` | Import `demo_a.mp4`, insert at 0 on V1 (audio lands on A1) |
+| `03-full.kdenlive` | `demo_a` 0–5.5 s and `demo_b` 5.5–11 s (in=0.5) on V1/A1 with a 1 s **mix** (U); title on V2 at 1.067 s for 3 s with "Fade in"; `music.m4a` on A2 at 0 s with Volume −6 dB and a 1 s Fade out |
+| `04-extras.kdenlive` | 03 + **Fade to black** (3 s, "Fade to Black" ticked) on `demo_b` |
+| `03-full.mp4` | `melt 03-full.kdenlive` with Kdenlive's bundled melt (reference render) |
 
-## 2. Document skeleton (what we generate, in this order)
+Supporting sources: Kdenlive's `dev-docs/fileformat.md`, `src/definitions.h` and the `tests/dataset` projects
+(in `lamtanloc512/kdenlive`).
 
-```xml
-<?xml version='1.0' encoding='utf-8'?>
-<mlt LC_NUMERIC="C" producer="main_bin" version="7.x.0" root="/abs/project/dir">
-  <profile description="HD 1080p 30 fps" width="1920" height="1080" progressive="1"
-           sample_aspect_num="1" sample_aspect_den="1" display_aspect_num="16" display_aspect_den="9"
-           frame_rate_num="30" frame_rate_den="1" colorspace="709"/>
+## 1. Times and numbers
 
-  <!-- (A) One bin producer/chain per media clip. kdenlive:id = bin id (int, unique). -->
-  <chain id="chain0" out="...">                       <!-- avformat clips are <chain> since 23.04 ❓ -->
-    <property name="resource">relative/or/abs/path.mp4</property>
-    <property name="mlt_service">avformat-novalidate</property>
-    <property name="kdenlive:id">2</property>
-    <property name="kdenlive:clip_type">0</property>   <!-- ❓ AV files show 0 in dataset; confirm -->
-    <property name="kdenlive:folderid">-1</property>
-    <property name="kdenlive:clipname">...</property>
-    <property name="length">N</property>
-    <property name="kdenlive:file_hash">md5</property> <!-- ❓ required, or recomputed on open? -->
-  </chain>
-  <producer id="producerN" ...>                      <!-- color / title (kdenlivetitle) / image clips -->
+* `LC_NUMERIC="C"`. Times are written as `HH:MM:SS.mmm` clock strings, with milliseconds rounded at the project fps
+  (30 fps: frame 179 = `00:00:05.967`). Kdenlive reads frame counts too. We write clock strings like Kdenlive does.
+* Entry `in`/`out` are **source frames, out inclusive**. 6 s at 30 fps = `in=00:00:00.000 out=00:00:05.967`.
+* Filters on entries: `in`/`out` are **source** frames of the entry (no attributes = whole clip).
+* Mix transitions: `in`/`out` are **track** positions, and `out = in + duration` (in=5.000 out=6.000 for a 1 s mix).
 
-  <!-- (B) For each timeline track: 2 playlists (the 2nd holds the B clip of mixes) inside a track tractor. -->
-  <playlist id="playlist0"> <property name="kdenlive:audio_track">1</property> ...entries/blanks... </playlist>
-  <playlist id="playlist1"> <property name="kdenlive:audio_track">1</property> </playlist>
-  <tractor id="tractor0" in="0">
-    <property name="kdenlive:audio_track">1</property>   <!-- audio tracks only -->
-    <property name="kdenlive:track_name">A1</property>    <!-- ❓ -->
-    <property name="kdenlive:trackheight">67</property>
-    <property name="kdenlive:timeline_active">1</property>
-    <track hide="video" producer="playlist0"/>            <!-- audio: hide="video"; video: hide="audio" -->
-    <track hide="video" producer="playlist1"/>
-    <!-- same-track mixes (dissolve/wipe) go here as <transition> with kdenlive:mixcut -->
-    <!-- internal audio filters on audio tracks: volume, panner, audiolevel (internal_added=237, disable=1) -->
-  </tractor>
+## 2. Document order (what Kdenlive writes, and what we write)
 
-  <!-- (C) The sequence tractor. Its id is the sequence uuid. Track 0 is the black background producer. -->
-  <producer id="producer_black" ...> mlt_service=color, resource=black, length=2147483647 </producer>
-  <tractor id="{uuid}" in="0" out="LAST_FRAME">
-    <property name="kdenlive:uuid">{uuid}</property>
-    <property name="kdenlive:producer_type">17</property>
-    <property name="kdenlive:id">BINID</property>
-    <property name="kdenlive:clipname">Sequence 1</property>
-    <property name="kdenlive:duration">HH:MM:SS.mmm</property>
-    <property name="kdenlive:maxduration">FRAMES</property>
-    <property name="kdenlive:sequenceproperties.documentuuid">{uuid}</property>
-    <property name="kdenlive:sequenceproperties.hasAudio">1</property>
-    <property name="kdenlive:sequenceproperties.hasVideo">1</property>
-    <property name="kdenlive:sequenceproperties.tracksCount">N</property>
-    <property name="kdenlive:sequenceproperties.groups">[ ...AVSplit groups json... ]</property>
-    <property name="kdenlive:sequenceproperties.guides">[]</property>
-    ... activeTrack, audioTarget, videoTarget, zoom, position, zonein/zoneout ...
-    <track producer="producer_black"/>
-    <track producer="tractor0"/>  <!-- audio tracks first (A2, A1), then video (V1, V2). ❓ order -->
-    ...
-    <!-- internal compositing: one per track, a_track=0 b_track=i -->
-    <transition> mlt_service=mix, sum=1, always_active=1, internal_added=237 (audio tracks) </transition>
-    <transition> mlt_service=qtblend, internal_added=237, always_active=1 (video tracks; 24.01 writes qtblend, 22.x wrote frei0r.cairoblend) ❓ 25.x </transition>
-    <!-- user compositions between tracks would go here (not used in v1) -->
-  </tractor>
-
-  <!-- (D) The bin: project settings + one entry per bin clip, including the sequence. -->
-  <playlist id="main_bin">
-    <property name="kdenlive:docproperties.version">1.1</property>
-    <property name="kdenlive:docproperties.kdenliveversion">25.08.x</property>  <!-- ❓ value we claim -->
-    <property name="kdenlive:docproperties.profile">atsc_1080p_30</property>
-    <property name="kdenlive:docproperties.documentid">EPOCH_MILLIS</property>
-    <property name="kdenlive:docproperties.uuid">{uuid}</property>
-    <property name="kdenlive:docproperties.activetimeline">{uuid}</property>
-    <property name="kdenlive:docproperties.opensequences">{uuid}</property>
-    <property name="kdenlive:sequenceFolder">-1</property>
-    <property name="xml_retain">1</property>
-    <entry producer="chain0" in="0" out="..."/>
-    <entry producer="{uuid}" in="0" out="0"/>
-  </playlist>
-
-  <!-- (E) The project tractor, always last: what melt plays. -->
-  <tractor id="tractorX" in="0" out="LAST_FRAME">
-    <property name="kdenlive:projectTractor">1</property>
-    <track producer="{uuid}" in="0" out="LAST_FRAME"/>
-  </tractor>
+```
+<mlt LC_NUMERIC="C" producer="main_bin" root="<project dir>" version="7.x">
+  <profile .../>
+  <producer id="producer0">  black background: mlt_service=color resource=black length=2147483647
+                             eof=continue aspect_ratio=1 mlt_image_format=rgba set.test_audio=0
+                             kdenlive:playlistid=black_track
+  for each track, BOTTOM-UP (A2, A1, V1, V2):
+      <chain|producer> per-track copies of the media used on this track (see §4)
+      <playlist id=playlistN>    items (blanks + entries)
+      <playlist id=playlistN+1>  second layer: B clips of mixes
+      <tractor id=tractorK>      the track: 2 <track> refs + same-track mix transitions + internal filters
+  <tractor id="{seq-uuid}">       the sequence (§5)
+  bin copies of every media clip (chainN), title producers are shared (§4)
+  <playlist id="main_bin">        document properties + one entry per bin clip (§6)
+  <tractor id=tractorX>           project tractor: kdenlive:projectTractor=1, one <track producer="{seq-uuid}" in out>
 </mlt>
 ```
 
-## 3. Timeline clips
-
-* A clip on the timeline is an `<entry producer="..." in="..." out="...">` in the track's **first** playlist,
-  with `<property name="kdenlive:id">BINID</property>`. Gaps are `<blank length="..."/>`.
-* `in`/`out` are source frames, and **`out` is inclusive** (a 5 s clip at 25 fps is `in=0 out=124`).
-* ❓ Kdenlive ≥ 23.04 writes a separate copy of the producer per track type (video and audio)
-  instead of pointing at the bin producer. Fixture 2 will show whether timeline entries reference
-  the bin chain or per-track copies, and what id scheme those copies use (`chainN`, `producerN`, `..._video`?).
-* An AV clip dropped on V1 creates a video part on V1 and an audio part on A1, linked by an `AVSplit`
-  group in `sequenceproperties.groups`. Leaves are `"trackPos:framePos"`, where trackPos counts tracks
-  from the bottom of the timeline: `{"type":"AVSplit","children":[{"type":"Leaf","leaf":"clip","data":"2:0"},{"type":"Leaf","leaf":"clip","data":"1:0"}]}` ❓ confirm indexing.
-
-## 4. Same-track mix (dissolve / wipe)
-
-From `test-mix.kdenlive`:
-
-* Clip A stays in playlist 0. Clip B moves to playlist 1 of the **same track tractor**, and the two overlap by the mix duration.
-* A `<transition in=… out=…>` inside the track tractor: `mlt_service=luma`, `kdenlive_id=luma`, `a_track=0`,
-  `b_track=1`, `kdenlive:mixcut=<frames from mix start to the original cut>`, `softness`, `alpha_over=1`,
-  `invert`, `reverse` (1 when A sits in the second playlist).
-* Dissolve = `luma` without a `resource`. Wipe = `luma` with a luma file `resource` ❓ (path form in 25.x).
-* Audio crossfade on audio tracks: `mlt_service=mix` with `kdenlive_id=mix` ❓.
-* The overlap needs **handles**: media beyond A's out point and before B's in point. If a clip is used
-  to its very end, the mix is impossible or shorter. We validate this and report how much handle is missing.
-
-## 5. Effects we need (v1)
-
-| Need | Kdenlive effect id | MLT service | Note |
-|---|---|---|---|
-| Clip volume in dB | `volume` (or `gain`) | `volume` | ❓ property names (`level` in dB?) |
-| Audio fade in/out | `fadein` / `fadeout` | `volume` | `data/effects/fadein.xml` |
-| Fade to black | `fade_to_black` | `brightness` | `data/effects/fade_to_black.xml` |
-| Title fade | ❓ alpha fade or `fade_from_black` | ❓ | check fixture 3 |
-
-Filters on a clip are `<filter>` children of the timeline `<entry>`, with `kdenlive_id` and
-`in`/`out` relative to the clip ❓.
-
-## 6. Title clip (kdenlivetitle)
+### Track tractor
 
 ```xml
-<producer id="producerN">
-  <property name="mlt_service">kdenlivetitle</property>
-  <property name="kdenlive:clip_type">6</property>
-  <property name="xmldata">&lt;kdenlivetitle duration="..." LC_NUMERIC="C" width="1920" height="1080" out="..."&gt;
-     &lt;item type="QGraphicsTextItem" z-index="0"&gt;
-       &lt;position x="..." y="..."&gt;&lt;transform&gt;1,0,0,0,1,0,0,0,1&lt;/transform&gt;&lt;/position&gt;
-       &lt;content font="..." font-pixel-size="..." font-color="r,g,b,a" alignment="4" ...&gt;TEXT&lt;/content&gt;
-     &lt;/item&gt;
-     &lt;startviewport rect="0,0,1920,1080"/&gt;&lt;endviewport rect="0,0,1920,1080"/&gt;&lt;background color="0,0,0,0"/&gt;
-  &lt;/kdenlivetitle&gt;</property>
-</producer>
+<tractor id="tractor1" in="00:00:00.000" out="<last frame>">
+  <property name="kdenlive:audio_track">1</property>   <!-- audio tracks only; also on both playlists -->
+  <property name="kdenlive:trackheight">75</property>
+  <property name="kdenlive:timeline_active">1</property>
+  <property name="kdenlive:collapsed">0</property>
+  <property name="kdenlive:thumbs_format"/>
+  <property name="kdenlive:audio_rec"/>
+  <track hide="video" producer="playlist2"/>          <!-- audio: hide="video"; video: hide="audio" -->
+  <track hide="video" producer="playlist3"/>
+  <transition .../>                                   <!-- mixes on this track -->
+  <filter> volume  internal_added=237 disable=1 window=75 max_gain=20dB channel_mask=-1 </filter>   <!-- audio only -->
+  <filter> panner  internal_added=237 disable=1 channel=-1 start=0.5 </filter>                       <!-- audio only -->
+  <filter> audiolevel internal_added=237 disable=1 iec_scale=0 dbpeak=1 </filter>                    <!-- audio only -->
+</tractor>
 ```
-❓ Every attribute above (font weight, line spacing, shadow, typewriter...) has to come from fixture 3.
-We emit exactly what Kdenlive 25.x writes, filled in from `title-presets.json`.
+An empty track tractor has no `out` attribute. Locked tracks add `kdenlive:locked_track=1`; after an unlock
+Kdenlive writes it empty.
 
-## 7. Round-trip rules (for the tests)
+## 3. Timeline entries
 
-"Semantic diff = no change" means equal after this normalization:
-1. Element ids are replaced by canonical ones (by order of appearance per element type); references follow.
-2. Property order is ignored; whitespace-only text is ignored.
-3. Times are compared as frames (`00:00:05.000` at 25 fps == `125`).
-4. Volatile properties are ignored: `docproperties.position`, `scrollPos`, `zoom`, `documentid`? ❓, `root`.
+```xml
+<playlist id="playlist2">
+  <property name="kdenlive:audio_track">1</property>
+  <blank length="00:00:05.000"/>
+  <entry in="00:00:00.000" out="00:00:05.967" producer="chain2">
+    <property name="kdenlive:id">5</property>            <!-- bin id -->
+    <property name="kdenlive:activeeffect">0</property>  <!-- only when it has effects -->
+    <filter .../>                                        <!-- clip effects (§7) -->
+  </entry>
+</playlist>
+```
 
-## 8. Open questions for the fixtures
+## 4. Media producers
 
-1. AV clip: `<chain>` vs `<producer>`; `clip_type` value; is `file_hash`/`file_size` required on load?
-2. Timeline entries: bin producer reference vs per-track copies, and their id naming.
-3. Track order in the sequence tractor, and `kdenlive:track_name`.
-4. Internal compositing per video track: 24.01 writes `qtblend`. Confirm 25.x does too.
-5. Exact title `xmldata` for 25.x and how a title fade is stored.
-6. Crossfade on video *and* audio: two mixes? Where does the audio one live?
-7. Music on A1: a plain audio clip with no video part, and no AVSplit group.
-8. `kdenliveversion` value and any new `docproperties` 25.x requires.
+* **Audio/video files are `<chain>`s** with `mlt_service=avformat-novalidate`. Kdenlive writes **one copy per
+  track that uses the clip, plus one for the bin**. The track copies set `set.test_audio`/`set.test_image`:
+  video track: `test_audio=1 test_image=0`; audio track: `test_audio=0 test_image=1`.
+  The bin copy sets neither, and also has `kdenlive:monitorPosition=0`. Audio-only bin copies use `mlt_service=avformat`.
+* Common properties: `length` (frames), `eof=pause`, `resource` (relative to `root`), `seekable=1`,
+  `audio_index`, `video_index` (-1 if none), `astream`, `vstream`, `format=3` (AV), `mute_on_pause=0`,
+  `kdenlive:id` (bin id), `kdenlive:folderid=-1`, `kdenlive:clip_type`, `kdenlive:control_uuid` (one uuid per bin clip,
+  same on every copy), `kdenlive:file_size`, `kdenlive:file_hash` (md5 of the first and last 1 MB, recomputed by
+  Kdenlive if missing), `xml=was here`.
+* `kdenlive:clip_type`: **0 = A/V file**, 1 = audio only, 2 = video only *and* title files, 17 = sequence.
+* `<chain out=…>` = length − 1.
+* **Title clips** are one `<producer>` shared by the timeline entry and the bin:
+  `mlt_service=kdenlivetitle`, `resource=<path to .kdenlivetitle>` (or `xmldata` when made in the title editor),
+  `length`, `kdenlive:duration=HH:MM:SS:FF`, `kdenlive:clip_type=2`, `force_reload=0`, `seekable=1`, `aspect_ratio=1`.
+  We write a `.kdenlivetitle` file per title next to the project (`<project>.titles/tN.kdenlivetitle`), using the
+  same XML as Kdenlive's `data/titles/simple.kdenlivetitle`.
+
+## 5. Sequence tractor
+
+```xml
+<tractor id="{uuid}" in="00:00:00.000" out="<last frame>">
+  <property name="kdenlive:uuid">{uuid}</property>
+  <property name="kdenlive:clipname">Sequence 1</property>
+  <property name="kdenlive:sequenceproperties.hasAudio">1</property>
+  <property name="kdenlive:sequenceproperties.hasVideo">1</property>
+  <property name="kdenlive:sequenceproperties.activeTrack">2</property>
+  <property name="kdenlive:sequenceproperties.tracksCount">4</property>
+  <property name="kdenlive:sequenceproperties.documentuuid">{uuid}</property>
+  <property name="kdenlive:duration">00:00:12.000</property>    <!-- clock string of total length -->
+  <property name="kdenlive:maxduration">360</property>          <!-- frames -->
+  <property name="kdenlive:producer_type">17</property>
+  <property name="kdenlive:id">3</property>                     <!-- bin id of the sequence -->
+  <property name="kdenlive:clip_type">0</property>
+  <property name="kdenlive:folderid">2</property>               <!-- the "Sequences" folder -->
+  <property name="kdenlive:sequenceproperties.audioTarget">1</property>
+  <property name="kdenlive:sequenceproperties.videoTarget">2</property>
+  <property name="kdenlive:sequenceproperties.tracks">4</property>
+  ... disablepreview=0 position=0 scrollPos=0 verticalzoom=1 zonein=0 zoneout=75 zoom=8 ...
+  <property name="kdenlive:sequenceproperties.groups">[ AVSplit groups ]</property>
+  <property name="kdenlive:sequenceproperties.guides">[ ]</property>
+  <track producer="producer0"/>     <!-- black -->
+  <track producer="tractor0"/>      <!-- A2 -->
+  <track producer="tractor1"/>      <!-- A1 -->
+  <track producer="tractor2"/>      <!-- V1 -->
+  <track producer="tractor3"/>      <!-- V2 -->
+  <!-- internal compositing, one per track, a_track=0 b_track=i -->
+  audio: mlt_service=mix kdenlive_id=mix internal_added=237 always_active=1 accepts_blanks=1 sum=1
+  video: mlt_service=qtblend kdenlive_id=qtblend internal_added=237 always_active=1 compositing=0 distort=0 rotate_center=0
+  <!-- master: volume + panner filters, internal_added=237, disable=1 -->
+</tractor>
+```
+An empty sequence has `kdenlive:duration=00:00:00:01`, `maxduration=1` and tractor `out=00:05:00.000`.
+The black producer's `out` is the timeline length + 5 minutes (`00:05:12.000` for a 12 s timeline).
+
+**AVSplit groups** link the audio and video parts of one clip. The leaf data is `"<track>:<position>:-1"`.
+`<track>` is the track index counted from the bottom **without** the black track (A2=0, A1=1, V1=2, V2=3).
+`<position>` is the item's start frame **as written** (for a mix B clip, the extended start).
+
+## 6. main_bin
+
+Properties (all present in an empty project):
+`kdenlive:folder.-1.2=Sequences`, `kdenlive:sequenceFolder=2`, and `kdenlive:docproperties.*`:
+`audioChannels=2 binsort=0 documentid=<ms> enableTimelineZone=0 enableexternalproxy=0 enableproxy=0
+externalproxyparams= generateimageproxy=0 generateproxy=0 guidesCategories=[…9 default categories…]
+kdenliveversion=26.08.3 patchversion=1 profile=atsc_1080p_30 proxy*=… seekOffset=9000 sessionid={uuid}
+uuid={seq uuid} version=1.1 opensequences={uuid} activetimeline={uuid}`. Also
+`kdenlive:expandedFolders`, `kdenlive:binZoom=4`, `kdenlive:extraBins=project_bin:-1:0`, `kdenlive:documentnotes`,
+`kdenlive:documentnotesversion=2`, and `xml_retain=1`. Kdenlive also stores the window `layout` here; we don't write it.
+
+Entries: first the sequence (`in=0 out=0`), then each bin clip (`in=0 out=length-1`).
+
+## 7. Mixes, effects, titles: exact XML
+
+**Same-track mix.** Example: cut at 5.5 s, 1 s, centred, so `mixcut` = 15 frames before the cut.
+* A stays in playlist 1 and is **extended** to `cut + (duration − mixcut)`.
+* B goes to playlist 2 (`<blank>` up to its start), starting at `cut − mixcut`, with `in` reduced by `mixcut`.
+* The transition sits inside the track tractor:
+
+```xml
+<!-- video track -->
+<transition in="00:00:05.000" out="00:00:06.000">
+  a_track=0 b_track=1 factory=loader resource="" mlt_service=luma kdenlive_id=luma kdenlive:mixcut=15
+  softness=0 alpha_over=0 fix_background_alpha=1 invert=0 reverse=0
+</transition>
+<!-- audio track (created automatically for the linked audio parts) -->
+<transition in="00:00:05.000" out="00:00:06.000">
+  a_track=0 b_track=1 duck_threshold=0 duck_attenuation=-12 duck_level=0 duck_fade_in=1500 duck_fade_out=250
+  prefix="" mlt_service=mix kdenlive_id=mix kdenlive:mixcut=15 start=-1 accepts_blanks=1 reverse=0
+</transition>
+```
+A **wipe** is the same luma with `resource` set to a luma file. Kdenlive refuses a mix without enough spare media
+("Not enough frames at clip start to apply the mix"), the same rule `transition_add` enforces.
+
+**Volume** (`kdenlive_id=volume`): `<filter> window=75 max_gain=20dB level="00:00:00.000=-6" channel_mask=-1 mlt_service=volume kdenlive_id=volume kdenlive:collapsed=0`
+
+**Audio fade out** (`fadeout`), on the last N frames: `<filter in=out-N out=out> window=75 max_gain=20dB channel_mask=-1 mlt_service=volume kdenlive_id=fadeout gain=1 end=0`.
+**Audio fade in** (`fadein`, from Kdenlive's `data/effects/fadein.xml`): `<filter in=in out=in+N> mlt_service=volume kdenlive_id=fadein gain=0 end=1`.
+
+**Video fade in (alpha)**, used for titles: `<filter out=N> start=1 level=1 mlt_service=brightness kdenlive_id=fade_from_black alpha="0=0;-1=1"`.
+
+**Fade to black** (video): `<filter in=out-N out=out> start=1 level="0=1;-1=0" mlt_service=brightness kdenlive_id=fade_to_black alpha=1`.
+Kdenlive does **not** fade the linked audio part; our `fade_to_black` adds a `fadeout` on the audio part as well.
+
+## 8. Rendering with melt
+
+* `melt project.kdenlive -consumer avformat:out.mp4 …` plays the project tractor.
+* **Titles need a Qt platform.** Without a display, `kdenlivetitle` renders opaque black frames. Set
+  `QT_QPA_PLATFORM=offscreen` when there is no `DISPLAY`/`WAYLAND_DISPLAY`. Verified with melt 7.43 (Kdenlive bundle)
+  and melt 7.22 (Ubuntu).
+* The bundled melt (AppImage/app bundle) needs its environment: `MLT_REPOSITORY`, `MLT_DATA`, `MLT_PROFILES_PATH`,
+  `FREI0R_PATH`, `LADSPA_PATH`.
+
+## 9. Round-trip rules (tests)
+
+Two documents are "the same" after normalization:
+1. element ids are renamed canonically (by element type and order of appearance), and references are rewritten;
+2. property order is ignored;
+3. volatile properties are dropped: `docproperties.layout`, `sessionid`, `documentid`, `browserurl`,
+   `sequenceproperties.position|scrollPos|zoom|activeTrack|audioTarget|videoTarget`, `kdenlive:activeeffect`,
+   `kdenlive:collapsed`, `trackheight`, `kdenlive:locked_track`, `binZoom`, `kdenlive:meta.*`, `kdenlive:kextractor`,
+   `kdenlive:record_start_frame*`, `root`, `version`.
