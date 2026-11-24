@@ -7,7 +7,8 @@ import dev.kdenlivemcp.model.TitleItem;
 import dev.kdenlivemcp.model.Track;
 import dev.kdenlivemcp.model.TrackKind;
 
-import java.util.Collection;
+import dev.kdenlivemcp.title.TitlePresets;
+import dev.kdenlivemcp.title.TitleStyle;
 import java.util.List;
 import java.util.Set;
 
@@ -20,7 +21,7 @@ public final class TitleOps {
     }
 
     public static EditResult add(Project p, String text, long at, long length, String trackId, String styleId,
-                                 Collection<String> styles) {
+                                 TitlePresets presets) {
         Draft d = new Draft(p);
         if (text == null || text.isBlank()) {
             throw new EditException("text must not be empty");
@@ -28,9 +29,7 @@ public final class TitleOps {
         if (text.length() > MAX_TEXT) {
             throw new EditException("text is " + text.length() + " characters; titles are limited to " + MAX_TEXT);
         }
-        if (styleId == null || !styles.contains(styleId)) {
-            throw new EditException("unknown title style '" + styleId + "'; styles: " + String.join(", ", styles));
-        }
+        TitleStyle style = presets.get(styleId);
         Track track = d.track(trackId);
         if (track.kind() != TrackKind.VIDEO) {
             throw new EditException("titles go on video tracks; " + track.id() + " is an audio track. Video tracks: "
@@ -38,7 +37,9 @@ public final class TitleOps {
         }
         d.requireFree(track.id(), at, length, Set.of());
         String id = d.newId("t");
-        d.put(track.id(), new TitleItem(id, text, styleId, at, length, Extras.NONE));
+        long fadeIn = Math.min(p.fps().frames(style.fadeIn()), length / 2);
+        long fadeOut = Math.min(p.fps().frames(style.fadeOut()), length / 2);
+        d.put(track.id(), new TitleItem(id, text, styleId, at, length, fadeIn, fadeOut, Extras.NONE));
         String summary = "added title " + id + " \"" + Draft.abbreviate(text) + "\" (" + styleId + ") on " + track.id()
                 + " " + d.sec(at) + "–" + d.sec(at + length);
         if (higherVideoTrackCount(p, track) == 0 && track.number() == 1) {

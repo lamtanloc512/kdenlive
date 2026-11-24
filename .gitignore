@@ -7,3 +7,4 @@ fixtures/media/*.mp4
 fixtures/media/*.m4a
 fixtures/fixture-kit.zip
 fixtures/*.mp4
+fixtures/generated/

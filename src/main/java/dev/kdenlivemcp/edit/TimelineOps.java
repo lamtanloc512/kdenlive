@@ -206,8 +206,9 @@ public final class TimelineOps {
         String summary;
         switch (item) {
             case TitleItem t -> {
-                d.replace(t.withLength(at - t.start()));
-                d.put(loc.track().id(), new TitleItem(rightId, t.text(), t.styleId(), at, t.end() - at, t.extras()));
+                d.replace(new TitleItem(t.id(), t.text(), t.styleId(), t.start(), at - t.start(), t.fadeIn(), 0, t.extras()));
+                d.put(loc.track().id(), new TitleItem(rightId, t.text(), t.styleId(), at, t.end() - at, 0, t.fadeOut(),
+                        t.extras()));
                 summary = "split " + d.describe(t) + " at " + d.sec(at) + " into " + t.id() + " and " + rightId;
             }
             case ClipItem c -> {

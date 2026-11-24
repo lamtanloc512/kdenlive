@@ -17,8 +17,8 @@ import java.util.Optional;
 /** Creating projects and adding media to the bin. */
 public final class ProjectOps {
 
-    /** Kdenlive's bin ids start at 2 (1 is never used for a clip in files Kdenlive writes). */
-    static final int FIRST_BIN_ID = 2;
+    /** Kdenlive gives the "Sequences" folder id 2 and the sequence id 3; clips start at 4. */
+    static final int FIRST_BIN_ID = 4;
 
     private ProjectOps() {
     }

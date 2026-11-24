@@ -1,0 +1,33 @@
+{
+  "_comment": "Title styles available to title_add. Edit freely: id (lower_snake_case), font, weight (400 normal, 700 bold), size (px at 1080p, scaled to the project height), color and outlineColor as r,g,b,a, outline (px), position (top | center | lower_third | bottom), fadeIn / fadeOut (seconds).",
+  "presets": [
+    {
+      "id": "lower_third",
+      "description": "white text with a thin outline in the lower third, 0.3s fades",
+      "font": "DejaVu Sans", "weight": 700, "size": 72,
+      "color": "255,255,255,255", "outline": 2, "outlineColor": "0,0,0,200",
+      "position": "lower_third", "fadeIn": 0.3, "fadeOut": 0.3
+    },
+    {
+      "id": "big_center",
+      "description": "large bold centered headline, 0.5s fades",
+      "font": "DejaVu Sans", "weight": 700, "size": 140,
+      "color": "255,255,255,255", "outline": 3, "outlineColor": "0,0,0,220",
+      "position": "center", "fadeIn": 0.5, "fadeOut": 0.5
+    },
+    {
+      "id": "top_caption",
+      "description": "medium caption at the top, no fades",
+      "font": "DejaVu Sans", "weight": 400, "size": 56,
+      "color": "255,255,255,255", "outline": 2, "outlineColor": "0,0,0,200",
+      "position": "top", "fadeIn": 0, "fadeOut": 0
+    },
+    {
+      "id": "subtitle",
+      "description": "subtitle-style text near the bottom edge, 0.15s fades",
+      "font": "DejaVu Sans", "weight": 400, "size": 52,
+      "color": "255,255,220,255", "outline": 3, "outlineColor": "0,0,0,255",
+      "position": "bottom", "fadeIn": 0.15, "fadeOut": 0.15
+    }
+  ]
+}

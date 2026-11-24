@@ -5,7 +5,8 @@ import dev.kdenlivemcp.model.Project;
 import dev.kdenlivemcp.model.TitleItem;
 import org.junit.jupiter.api.Test;
 
-import java.util.List;
+import dev.kdenlivemcp.title.TitlePresets;
+import dev.kdenlivemcp.title.TitleStyle;
 
 import static dev.kdenlivemcp.edit.Fixtures.f;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -14,7 +15,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class AudioAndTitleOpsTest {
 
     private final Project base = TimelineOps.insert(Fixtures.withMedia(), "m1", "V1", 0, null, null, true).project();
-    private static final List<String> STYLES = List.of("lower_third", "big_center");
+    private static final TitlePresets STYLES = new TitlePresets(java.util.Map.of(
+            "lower_third", new TitleStyle("lower_third", "", "DejaVu Sans", 700, 72, "255,255,255,255", 2, "0,0,0,200",
+                    "lower_third", 0.3, 0.3),
+            "big_center", new TitleStyle("big_center", "", "DejaVu Sans", 700, 140, "255,255,255,255", 2, "0,0,0,200",
+                    "center", 0, 0)));
 
     @Test
     void audioSetOnVideoItemGoesToLinkedAudio() {
@@ -51,13 +56,14 @@ class AudioAndTitleOpsTest {
         TitleItem t = (TitleItem) r.project().track("V2").orElseThrow().items().getFirst();
         assertThat(t.start()).isEqualTo(f(1));
         assertThat(t.length()).isEqualTo(f(3));
+        assertThat(t.fadeIn()).isEqualTo(f(0.3));
         assertThat(r.summary()).isEqualTo("added title t6 \"Hello world\" (lower_third) on V2 1.000–4.000");
     }
 
     @Test
     void titleValidation() {
         assertThatThrownBy(() -> TitleOps.add(base, "Hi", 0, f(3), "V2", "comic_sans", STYLES))
-                .hasMessage("unknown title style 'comic_sans'; styles: lower_third, big_center");
+                .hasMessageStartingWith("unknown title style 'comic_sans'; styles: ");
         assertThatThrownBy(() -> TitleOps.add(base, "Hi", 0, f(3), "A1", "lower_third", STYLES))
                 .hasMessage("titles go on video tracks; A1 is an audio track. Video tracks: V2, V1");
         assertThatThrownBy(() -> TitleOps.add(base, " ", 0, f(3), "V2", "lower_third", STYLES))
