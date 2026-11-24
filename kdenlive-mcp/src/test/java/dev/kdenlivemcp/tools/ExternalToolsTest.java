@@ -48,4 +48,16 @@ class ExternalToolsTest {
         assertThat(caps.missing(Map.of("producers", java.util.List.of("avformat", "kdenlivetitle"))))
                 .containsExactly("producers/kdenlivetitle");
     }
+
+    @Test
+    void reportsMltModulesThatFailToLoad() {
+        String linux = "mlt_repository_init: failed to dlopen /x/usr/lib/mlt-7/libmltqt6.so\n"
+                + "  (libOpenGL.so.0: cannot open shared object file: No such file or directory)\n";
+        String mac = "mlt_repository_init: failed to dlopen /x/PlugIns/mlt/libmltqt6.so\n"
+                + "  (dlopen(/x/PlugIns/mlt/libmltqt6.so, 0x0002): Library not loaded: @executable_path/QtXml)\n";
+        org.assertj.core.api.Assertions.assertThat(ExternalTools.parseLoadErrors(linux))
+                .containsExactly("libmltqt6.so: libOpenGL.so.0 missing");
+        org.assertj.core.api.Assertions.assertThat(ExternalTools.parseLoadErrors(mac))
+                .containsExactly("libmltqt6.so: @executable_path/QtXml missing");
+    }
 }

@@ -8,8 +8,10 @@ as melt, ffmpeg and ffprobe plus the libraries they load:
   * macOS arm64: every MLT module the Kdenlive.app ships (so all of Kdenlive's effects and transitions render), the
     frei0r and LADSPA plugins, the Qt offscreen platform, Kdenlive's HD lumas and LUTs. Built by
     scripts/build-macos-tools.sh from the DMG's Kdenlive.app; frameworks keep their code signatures.
-  * Linux x86_64: the MLT modules kdenlive-mcp needed before effects were supported (core, avformat, qt6, kdenlive,
-    plus, xml, normalize, resample); not rebuilt yet.
+  * Linux x86_64: every MLT module the AppImage ships, the frei0r and LADSPA plugins, the Qt offscreen platform,
+    Kdenlive's HD lumas and LUTs, and the libraries they need from the AppImage. Built by
+    scripts/build-linux-tools.sh; GL/X11 dispatch libraries (libOpenGL, libGLX, libEGL, libX11, libxcb) and libc
+    come from the host, as with the AppImage itself.
 Only the small bin/ wrapper scripts were added.
 
 Main components and licenses (see each project for the full terms):

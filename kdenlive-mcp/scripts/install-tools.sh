@@ -16,12 +16,27 @@ report() {
   echo "installed into $DEST"
   for exe in melt ffprobe ffmpeg; do
     if [ -x "$DEST/bin/$exe" ]; then
-      printf '  %-8s %s\n' "$exe" "$("$DEST/bin/$exe" -version 2>&1 | grep -m1 -iE "^(melt|ffmpeg|ffprobe) " || echo '?')"
+      printf '  %-8s %s\n' "$exe" "$("$DEST/bin/$exe" -version 2>&1 | grep -m1 -iE "^(melt(-7)?|ffmpeg|ffprobe) " || echo '?')"
     fi
   done
   if [ -x "$DEST/bin/melt" ]; then
     n="$("$DEST/bin/melt" -query producers 2>/dev/null | grep -c kdenlivetitle || true)"
     if [ "$n" -gt 0 ]; then echo "  titles: supported (kdenlivetitle found)"; else echo "  warning: this melt has no kdenlivetitle producer" >&2; fi
+    echo "  effects: $("$DEST/bin/melt" -query filters 2>/dev/null | grep -c '^  - ' || true) MLT filters, $("$DEST/bin/melt" -query transitions 2>/dev/null | grep -c '^  - ' || true) transitions"
+    # MLT modules that need libraries from the system (GL dispatch, X11) and fail to load without them
+    missing="$("$DEST/bin/melt" -query filters 2>&1 | grep -oE '[A-Za-z0-9_.+-]+\.so(\.[0-9]+)*: cannot open shared object' | cut -d: -f1 | sort -u || true)"
+    if [ -n "$missing" ]; then
+      echo "  warning: some MLT modules cannot load; missing system libraries: $(echo $missing)" >&2
+      pkgs=""
+      for lib in $missing; do
+        case "$lib" in
+          libOpenGL.so*) pkgs="$pkgs libopengl0" ;; libGLX.so*) pkgs="$pkgs libglx0" ;; libEGL.so*) pkgs="$pkgs libegl1" ;;
+          libGL.so*) pkgs="$pkgs libgl1" ;; libX11.so*) pkgs="$pkgs libx11-6" ;; libxcb.so*) pkgs="$pkgs libxcb1" ;;
+          libdrm.so*) pkgs="$pkgs libdrm2" ;; *) pkgs="$pkgs ($lib)" ;;
+        esac
+      done
+      echo "  Debian/Ubuntu: sudo apt install$pkgs   (titles need the qt6 module)" >&2
+    fi
   fi
 }
 

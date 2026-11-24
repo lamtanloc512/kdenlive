@@ -196,13 +196,18 @@ public class ExternalTools {
             return MltCapabilities.none();
         }
         Map<String, Set<String>> services = new LinkedHashMap<>();
+        Set<String> loadErrors = new LinkedHashSet<>();
         for (String kind : List.of("producers", "transitions", "filters", "consumers")) {
             ProcessRunner.Result r = ProcessRunner.run(
                     List.of(melt.get().path().toString(), "-query", kind),
                     Duration.ofSeconds(30), melt.get().env(), null);
             services.put(kind, parseList(r.stdout() + "\n" + r.stderr()));
+            loadErrors.addAll(parseLoadErrors(r.stderr()));
         }
-        MltCapabilities caps = new MltCapabilities(services);
+        MltCapabilities caps = new MltCapabilities(services, List.copyOf(loadErrors));
+        if (!loadErrors.isEmpty()) {
+            LOG.warnf("MLT modules that failed to load: %s", loadErrors);
+        }
         List<String> missing = caps.missing(REQUIRED_MLT);
         if (missing.isEmpty()) {
             LOG.info("melt has every MLT service we need");
@@ -211,6 +216,26 @@ public class ExternalTools {
         }
         return caps;
     }
+
+    /** "libmltqt6.so: libOpenGL.so.0 missing" from melt's "failed to dlopen" messages. */
+    static List<String> parseLoadErrors(String stderr) {
+        List<String> out = new java.util.ArrayList<>();
+        String[] lines = stderr.split("\\R");
+        for (int i = 0; i < lines.length; i++) {
+            Matcher m = DLOPEN.matcher(lines[i]);
+            if (m.find()) {
+                String module = Path.of(m.group(1).trim()).getFileName().toString();
+                String reason = i + 1 < lines.length ? lines[i + 1].trim() : "";
+                Matcher lib = MISSING_LIB.matcher(reason);
+                out.add(module + ": " + (lib.find() ? (lib.group(1) != null ? lib.group(1) : lib.group(2)) + " missing"
+                        : reason));
+            }
+        }
+        return out;
+    }
+
+    private static final Pattern DLOPEN = Pattern.compile("failed to dlopen (\\S+)");
+    private static final Pattern MISSING_LIB = Pattern.compile("([A-Za-z0-9_.+-]+\\.so[0-9.]*): cannot open shared object|Library not loaded: ([^\\s)]+)");
 
     static Set<String> parseList(String text) {
         Set<String> out = new LinkedHashSet<>();

@@ -52,6 +52,11 @@ public class ServerTools {
             sb.append(" (titles will not render: use the melt bundled with Kdenlive, which has the qt module)");
         }
         sb.append('\n');
+        if (!caps.loadErrors().isEmpty()) {
+            sb.append("MLT modules not loaded: ").append(String.join("; ", caps.loadErrors()))
+                    .append(" (install the missing system libraries, e.g. on Debian/Ubuntu: apt install libopengl0 libglx0 "
+                            + "libegl1)\n");
+        }
         sb.append("title rendering: ").append(backend.titleRenderingProblem().orElse("ok")).append('\n');
         sb.append("work dir: ").append(config.workDir()).append('\n');
         sb.append("log dir: ").append(config.logDir());

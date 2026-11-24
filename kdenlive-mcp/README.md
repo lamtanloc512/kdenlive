@@ -13,11 +13,13 @@ arrange them, add titles, dissolves, fades and music, look at frames, and render
 ## 1. Install melt, ffmpeg and ffprobe
 
 The binaries ship with this repo, in `bundled-tools/`. They are taken unmodified from the official Kdenlive 26.08.3
-release and trimmed to `melt`, `ffmpeg`, `ffprobe`, the MLT modules kdenlive-mcp uses, and the libraries those load:
+release: `melt`, `ffmpeg`, `ffprobe`, every MLT module Kdenlive ships (so all of its effects and transitions render),
+frei0r and LADSPA plugins, wipe shapes and LUTs, and the libraries those load. `scripts/build-macos-tools.sh` and
+`scripts/build-linux-tools.sh` rebuild them from the official DMG / AppImage:
 
 | Archive | Platform | Size | Unpacked |
 |---|---|---|---|
-| `kdenlive-mcp-tools-linux-x64.tar.xz` | Linux x86_64 (from the AppImage) | 45 MB | 154 MB |
+| `kdenlive-mcp-tools-linux-x64.tar.xz` | Linux x86_64 (from the AppImage, all MLT modules) | 61 MB | 248 MB |
 | `kdenlive-mcp-tools-macos-arm64.tar.xz` | macOS Apple Silicon (from the DMG, all MLT modules) | 45 MB | 192 MB |
 
 ```bash
@@ -36,8 +38,10 @@ Other options. The server tries them in this order:
 4. `/usr/local/bin`, `/usr/bin`, `PATH`
 
 Call the `server_check` tool to see what was picked up and whether titles can render.
-**Linux note:** distribution `melt` builds older than about MLT 7.30 (Ubuntu 24.04 ships 7.22) cannot render titles
-without an X11 display. Use the script, or run the server under `xvfb-run`.
+**Linux note:** the bundled modules load the host's GL/X11 dispatch libraries, like the AppImage does. On a minimal
+server install them (Debian/Ubuntu: `apt install libopengl0 libglx0 libegl1 libx11-6 libxcb1`); `install-tools.sh`
+and `server_check` name what is missing. Distribution `melt` builds older than about MLT 7.30 (Ubuntu 24.04 ships
+7.22) cannot render titles without an X11 display.
 
 ## 2. Build
 
@@ -156,8 +160,7 @@ MELT_PATH=~/.kdenlive-mcp/tools/bin/melt ./mvnw verify
   proxies are refused when opened. Reverse speed and time remapping are not modelled (a reversed clip plays forward).
 * **Effects:** every effect in Kdenlive's catalog can be added, set, keyframed and reordered on items, tracks and the
   master (see docs/tools.md). Effects made in Kdenlive are editable too. Complex parameter types (curves, splines,
-  roto masks, gradients) take Kdenlive's raw string format. The Linux tools archive still has only the MLT modules of
-  the first release, so fewer effects render there (macOS has all of them).
+  roto masks, gradients) take Kdenlive's raw string format.
 * **`clip_trim` keeps the item's start;** shortening the in point does not move the clip.
 * **Dissolves need spare media around the cut,** like Kdenlive's own mixes. The error says how to trim to make room.
 * **Kdenlive doesn't notice when the file changes.** Reopen the project there after Claude edits it, and don't edit the same project in both at once.

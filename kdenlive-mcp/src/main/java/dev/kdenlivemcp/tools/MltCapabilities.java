@@ -6,10 +6,15 @@ import java.util.Map;
 import java.util.Set;
 
 /** The MLT services the resolved melt reports via {@code melt -query <kind>}. */
-public record MltCapabilities(Map<String, Set<String>> services) {
+public record MltCapabilities(Map<String, Set<String>> services, List<String> loadErrors) {
 
     public MltCapabilities {
         services = Map.copyOf(services);
+        loadErrors = List.copyOf(loadErrors);
+    }
+
+    public MltCapabilities(Map<String, Set<String>> services) {
+        this(services, List.of());
     }
 
     public static MltCapabilities none() {
