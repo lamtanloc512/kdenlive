@@ -1,0 +1,33 @@
+{
+  "_comment": "Title styles available to title_add. Edit freely: id (lower_snake_case), font, weight (400 normal, 700 bold), size (px at 1080p, scaled to the project height), color / outlineColor / box as r,g,b,a, outline (px), position (top | center | lower_third | bottom), fadeIn / fadeOut (seconds), box = translucent band behind the text (omit for none).",
+  "presets": [
+    {
+      "id": "lower_third",
+      "description": "white bold text on a dark translucent band in the lower third, 0.3s fades",
+      "font": "DejaVu Sans", "weight": 700, "size": 72,
+      "color": "255,255,255,255", "outline": 2, "outlineColor": "0,0,0,200",
+      "position": "lower_third", "fadeIn": 0.3, "fadeOut": 0.3, "box": "0,0,0,150"
+    },
+    {
+      "id": "big_center",
+      "description": "large bold centered headline on a dark translucent band, 0.5s fades",
+      "font": "DejaVu Sans", "weight": 700, "size": 140,
+      "color": "255,255,255,255", "outline": 3, "outlineColor": "0,0,0,220",
+      "position": "center", "fadeIn": 0.5, "fadeOut": 0.5, "box": "0,0,0,110"
+    },
+    {
+      "id": "top_caption",
+      "description": "medium caption on a dark band at the top, no fades",
+      "font": "DejaVu Sans", "weight": 400, "size": 56,
+      "color": "255,255,255,255", "outline": 2, "outlineColor": "0,0,0,200",
+      "position": "top", "fadeIn": 0, "fadeOut": 0, "box": "0,0,0,130"
+    },
+    {
+      "id": "subtitle",
+      "description": "subtitle-style text near the bottom edge, 0.15s fades",
+      "font": "DejaVu Sans", "weight": 400, "size": 52,
+      "color": "255,255,220,255", "outline": 3, "outlineColor": "0,0,0,255",
+      "position": "bottom", "fadeIn": 0.15, "fadeOut": 0.15
+    }
+  ]
+}
