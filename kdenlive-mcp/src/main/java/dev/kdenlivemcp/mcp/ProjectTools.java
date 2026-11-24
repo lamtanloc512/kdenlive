@@ -19,10 +19,12 @@ public class ProjectTools {
 
     private final ProjectSession session;
     private final KdenliveXmlBackend backend;
+    private final dev.kdenlivemcp.assets.AssetCatalog catalog;
 
-    public ProjectTools(ProjectSession session, KdenliveXmlBackend backend) {
+    public ProjectTools(ProjectSession session, KdenliveXmlBackend backend, dev.kdenlivemcp.assets.AssetCatalog catalog) {
         this.session = session;
         this.backend = backend;
+        this.catalog = catalog;
     }
 
     @Tool(name = "project_new", description = """
@@ -55,7 +57,7 @@ public class ProjectTools {
             Path file = projectPath(path);
             Project p = backend.load(file);
             session.open(p);
-            return Formatters.summary(p, 0, warnings(p));
+            return Formatters.summary(p, catalog, 0, warnings(p));
         });
     }
 
@@ -77,7 +79,7 @@ public class ProjectTools {
     public String projectSummary() {
         return ToolSupport.call("project_summary", () -> {
             Project p = session.current();
-            return Formatters.summary(p, session.undoDepth(), warnings(p));
+            return Formatters.summary(p, catalog, session.undoDepth(), warnings(p));
         });
     }
 

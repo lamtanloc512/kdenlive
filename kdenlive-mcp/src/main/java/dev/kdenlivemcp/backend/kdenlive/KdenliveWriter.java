@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.kdenlivemcp.media.MediaInfo;
 import dev.kdenlivemcp.media.MediaKind;
 import dev.kdenlivemcp.model.ClipItem;
+import dev.kdenlivemcp.model.Effect;
 import dev.kdenlivemcp.model.FadeToBlack;
 import dev.kdenlivemcp.model.Fps;
 import dev.kdenlivemcp.model.MediaClip;
@@ -267,6 +268,7 @@ public final class KdenliveWriter {
         if (audio) {
             internalAudioFilters(tractor, true);
         }
+        track.effects().forEach(fx -> writeEffect(tractor, fx));
         track.extras().xml().forEach(x -> Xml.appendFragment(tractor, renumber(x)));
         return tractor.getAttribute("id");
     }
@@ -328,6 +330,7 @@ public final class KdenliveWriter {
                                 pl.outInclusive()));
                     }
                 }
+                c.effects().forEach(fx -> filters.add(() -> writeEffect(e, fx)));
                 fadeToBlack(c.id()).ifPresent(f -> filters.add(() -> fadeToBlackFilter(e, pl, f.length(), true)));
                 c.extras().xml().forEach(x -> filters.add(() -> Xml.appendFragment(e, renumber(x))));
             }
@@ -343,6 +346,7 @@ public final class KdenliveWriter {
                         Xml.prop(f, "kdenlive:collapsed", 0);
                     });
                 }
+                t.effects().forEach(fx -> filters.add(() -> writeEffect(e, fx)));
                 if (t.fadeOut() > 0) {
                     filters.add(() -> fadeToBlackFilter(e, pl, t.fadeOut(), false));
                 }
@@ -370,6 +374,12 @@ public final class KdenliveWriter {
             f.setAttribute("out", out);
         }
         return f;
+    }
+
+    /** A user effect, properties in their stored order (Kdenlive's own layout for effects it wrote). */
+    private void writeEffect(Element parent, Effect fx) {
+        Element f = filter(parent, fx.in() == null ? null : clock(fx.in()), fx.out() == null ? null : clock(fx.out()));
+        fx.props().forEach((k, v) -> Xml.prop(f, k, v));
     }
 
     private void volume(Element entry, double db) {
@@ -666,6 +676,7 @@ public final class KdenliveWriter {
         }
         p.meta().extras().xml().forEach(x -> Xml.appendFragment(seq, renumber(x)));
         internalAudioFilters(seq, false);
+        p.masterEffects().forEach(fx -> writeEffect(seq, fx));
     }
 
     private String groupsJson() {
@@ -779,6 +790,20 @@ public final class KdenliveWriter {
                     o.put("fadeOut", ti.fadeOut());
                 }
             }
+        }
+        ObjectNode effects = root.putObject("effects");
+        for (Track t : p.tracks()) {
+            for (int k = 0; k < t.effects().size(); k++) {
+                effects.put(t.id() + "#" + k, t.effects().get(k).id());
+            }
+            for (TimelineItem i : t.items()) {
+                for (int k = 0; k < i.effects().size(); k++) {
+                    effects.put(i.id() + "#" + k, i.effects().get(k).id());
+                }
+            }
+        }
+        for (int k = 0; k < p.masterEffects().size(); k++) {
+            effects.put(Project.MASTER + "#" + k, p.masterEffects().get(k).id());
         }
         ObjectNode transitions = root.putObject("transitions");
         for (Transition t : p.transitions()) {

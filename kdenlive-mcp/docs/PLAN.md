@@ -212,7 +212,9 @@ Rendering details:
 
 * No ripple or insert-push edits. Overlapping placement is rejected rather than overwritten.
 * One sequence: we edit the active one and pass the others through untouched.
-* No keyframes and no effects beyond volume/fades/fade-to-black. Existing effects are preserved but not editable.
+* ~~No keyframes and no effects beyond volume/fades/fade-to-black.~~ Done (phase 2a): Kdenlive's whole effect
+  catalog with keyframes on items, tracks and the master; tracks can be added/removed; camera moves.
+  Next: compositions between tracks (2b); speed, generators, subtitles, guides (2c).
 * Kdenlive doesn't notice when the file changes under it. Reopen the project in Kdenlive after Claude edits it.
 * Proxies, image sequences and variable-frame-rate media are untested. VFR may drift (we warn on import).
 * Rotation metadata is reported by `media_import`, but we don't auto-correct it.

@@ -164,6 +164,71 @@ audio_set(itemId="c16", volumeDb=-3, fadeIn=0.5, fadeOut=2.5)
 → undid audio_set c11; 7 more step(s) available
 ```
 
+## Effects (Kdenlive's whole catalog)
+
+The server ships Kdenlive's own effect definitions (`src/main/resources/kdenlive-assets`, synced from Kdenlive's
+`data/` by `scripts/sync-kdenlive-assets.sh`), so every effect in Kdenlive's Effects panel can be added, set and
+keyframed, and Kdenlive opens the result as if you had made it there. Kdenlive's `excluded_effects.txt` is honoured,
+and an effect is offered only when the local melt has its MLT service (the bundled macOS tools have every module the
+Kdenlive.app has: 292 effects on macOS arm64, the same set Kdenlive offers there).
+
+Values use the units Kdenlive shows in its effect panel (e.g. Intensity 0..400 %, not MLT's 0..4). Keyframe times
+are seconds from the start of the target; for items they are stored in source frames, so trimming or splitting a
+clip keeps the animation on the same pictures.
+
+Targets: an item (`c4`, `t7`), a track (`V1`, `A2`: applies to everything on it) or `master` (the whole timeline,
+after the tracks are mixed). An audio effect on the video part of an A/V clip goes to its audio part.
+
+### `effect_catalog(query?, kind?, category?, includeUnavailable=false)`
+```
+effect_catalog()                      → 292 effects available in this melt. Categories: Blur and Sharpen: 11 (...) ...
+effect_catalog(query="blur")          → avfilter.gblur — Gaussian Blur: Apply Gaussian Blur filter ...
+effect_catalog(query="eq", kind="audio")
+```
+
+### `effect_info(effect)`
+Every settable parameter with type, range, default and choices; `*` marks keyframable ones.
+```
+effect_info(effect="avfilter.gblur")
+→ av.sigma* (number) "Sigma" (0..600) default 10 — Set sigma, the standard deviation of Gaussian blur ...
+```
+
+### `effect_add(target, effect, params?, keyframes?, position?)`
+`params`: fixed values `{name: value}`. `keyframes`: `[{t, ease?, <param>: value, ...}]`, `t` in seconds from the
+target start or `"end"`. Eases: `linear` (default), `smooth`, `discrete`, `ease_in`, `ease_out`, `ease_in_out`, and
+`sine|quad|cubic|quart|quint|expo|circ|back|elastic|bounce` + `_in|_out|_in_out`. Value types: numbers, `true/false`,
+choices by value or label, colors `#RRGGBB[AA]`, rects `{x,y,w,h,opacity}` in pixels, points `{x,y}`.
+```
+effect_add(target="c4", effect="avfilter.gblur", keyframes=[{"t":0,"av.sigma":30},{"t":1.2,"av.sigma":0}])
+→ added e11 Gaussian Blur (avfilter.gblur) to c4 (clip.mp4): av.sigma keyframed at 0.000s, 1.200s
+effect_add(target="master", effect="vignette", params={"opacity": 0.6})
+```
+
+### `effect_set(effectId, params?, keyframes?, enabled?)` / `effect_move(effectId, index)` / `effect_remove(effectId)`
+`params` makes a parameter constant, `keyframes` replaces the animation of the parameters it names, `enabled=false`
+bypasses the effect. Effects run first to last; `effect_move` reorders them.
+
+### `effect_list(target?, all=false)`
+Current values (non-default ones unless `all`) and keyframes, per target. `timeline_get` shows the same compactly.
+
+### `clip_transform(target, keyframes, clamp=true)`
+Camera moves (Ken Burns, punch-in, push, spin, fade) as Kdenlive's Transform effect: `[{t, zoom, x?, y?, rotation?,
+opacity?, ease?}]`. `zoom` 1 = normal; `x`/`y` = point of the picture to center on (0..1). With `clamp`, a zoomed
+picture never shows black edges. Calling it again replaces the move.
+```
+clip_transform(target="c4", keyframes=[{"t":0,"zoom":1},{"t":"end","zoom":1.3,"x":0.7,"y":0.4,"ease":"ease_in_out"}])
+→ camera move on c4 (Transform e10): 0.000s zoom 1 at (0.5, 0.5) → 5.967s zoom 1.3 at (0.7, 0.4) ease_in_out
+```
+
+## Tracks
+
+### `track_add(kind, name?)` / `track_set(track, muted?, hidden?, locked?, name?)` / `track_remove(track)`
+Track ids are positional like Kdenlive's: new video tracks go on top (V3 covers V2 and V1), new audio tracks at the
+bottom. Removing a track removes its items (and their linked parts) and renumbers the others.
+```
+track_add(kind="video", name="Overlays") → added video track V3 "Overlays" on top ...; tracks: V3, V2, V1, A1, A2
+```
+
 ## Looking at the edit
 
 ### `preview_frame(t)`

@@ -2,12 +2,14 @@ package dev.kdenlivemcp.edit;
 
 import dev.kdenlivemcp.model.ClipItem;
 import dev.kdenlivemcp.model.EditException;
+import dev.kdenlivemcp.model.Effect;
 import dev.kdenlivemcp.model.Fps;
 import dev.kdenlivemcp.model.MediaClip;
 import dev.kdenlivemcp.model.Project;
 import dev.kdenlivemcp.model.TimelineItem;
 import dev.kdenlivemcp.model.TitleItem;
 import dev.kdenlivemcp.model.Track;
+import dev.kdenlivemcp.model.TrackKind;
 import dev.kdenlivemcp.model.Transition;
 
 import java.util.ArrayList;
@@ -27,6 +29,9 @@ final class Draft {
     final Map<String, List<TimelineItem>> items = new LinkedHashMap<>();
     final List<Transition> transitions;
     final List<String> notes = new ArrayList<>();
+    /** Track shells (items live in {@link #items}); mutable so tracks can be added, renamed and flagged. */
+    final List<Track> tracks;
+    final List<Effect> masterEffects;
     private long nextId;
 
     record Located(Track track, TimelineItem item) {
@@ -39,6 +44,8 @@ final class Draft {
             items.put(t.id(), new ArrayList<>(t.items()));
         }
         this.transitions = new ArrayList<>(p.transitions());
+        this.tracks = new ArrayList<>(p.tracks());
+        this.masterEffects = new ArrayList<>(p.masterEffects());
         this.nextId = p.nextId();
     }
 
@@ -54,18 +61,146 @@ final class Draft {
         return prefix + (nextId++);
     }
 
+    // ---------------------------------------------------------------- effect owners
+
+    enum OwnerKind { ITEM, TRACK, MASTER }
+
+    /**
+     * Something that has an effect stack.
+     *
+     * @param key item id, track id, or {@link Project#MASTER}
+     * @param trackKind kind of the item's/track's track; null for the master
+     * @param start timeline frame where the owner starts
+     * @param anchor frame of the owner's start in the effect time base (source frames for items, else timeline)
+     */
+    record Owner(OwnerKind kind, String key, TrackKind trackKind, long start, long length, long anchor,
+                 int contentWidth, int contentHeight) {
+
+        String label() {
+            return switch (kind) {
+                case ITEM -> key;
+                case TRACK -> "track " + key;
+                case MASTER -> "master";
+            };
+        }
+    }
+
+    record EffectRef(Owner owner, int index, Effect effect) {
+    }
+
+    /** Resolves an item id, a track id (V1, A2) or "master". */
+    Owner owner(String target) {
+        if (target == null || target.isBlank()) {
+            throw new EditException("target is required: an item id (c4, t7), a track id (" + trackIds()
+                    + ") or master");
+        }
+        String t = target.trim();
+        long duration = Math.max(1, build().duration());
+        int w = base.profile().width();
+        int h = base.profile().height();
+        if (t.equalsIgnoreCase(Project.MASTER)) {
+            return new Owner(OwnerKind.MASTER, Project.MASTER, null, 0, duration, 0, w, h);
+        }
+        Optional<Track> track = tracks.stream().filter(x -> x.id().equalsIgnoreCase(t)).findFirst();
+        if (track.isPresent()) {
+            return new Owner(OwnerKind.TRACK, track.get().id(), track.get().kind(), 0, duration, 0, w, h);
+        }
+        Optional<Located> loc = find(t);
+        if (loc.isEmpty()) {
+            throw new EditException("unknown target '" + target + "': use an item id"
+                    + (allItemIds().isEmpty() ? "" : " (" + String.join(", ", allItemIds()) + ")")
+                    + ", a track id (" + trackIds() + ") or master");
+        }
+        return ownerOf(loc.get());
+    }
+
+    Owner ownerOf(Located loc) {
+        TimelineItem i = loc.item();
+        int cw = base.profile().width();
+        int ch = base.profile().height();
+        if (i instanceof ClipItem c) {
+            MediaClip m = media(c.mediaId());
+            if (m.info().displayWidth() > 0 && m.info().displayHeight() > 0) {
+                cw = m.info().displayWidth();
+                ch = m.info().displayHeight();
+            }
+        }
+        return new Owner(OwnerKind.ITEM, i.id(), loc.track().kind(), i.start(), i.length(), i.sourceIn(), cw, ch);
+    }
+
+    String trackIds() {
+        return tracks.stream().map(Track::id).collect(Collectors.joining(", "));
+    }
+
+    List<Effect> effects(Owner o) {
+        return switch (o.kind()) {
+            case MASTER -> masterEffects;
+            case TRACK -> trackShell(o.key()).effects();
+            case ITEM -> locate(o.key()).item().effects();
+        };
+    }
+
+    void setEffects(Owner o, List<Effect> list) {
+        switch (o.kind()) {
+            case MASTER -> {
+                masterEffects.clear();
+                masterEffects.addAll(list);
+            }
+            case TRACK -> {
+                Track t = trackShell(o.key());
+                tracks.set(tracks.indexOf(t), t.withEffects(list));
+            }
+            case ITEM -> replace(locate(o.key()).item().withEffects(list));
+        }
+    }
+
+    Track trackShell(String id) {
+        return tracks.stream().filter(t -> t.id().equalsIgnoreCase(id)).findFirst()
+                .orElseThrow(() -> new EditException("track '" + id + "' does not exist; tracks: " + trackList()));
+    }
+
+    /** Finds an effect by id anywhere in the project. */
+    EffectRef locateEffect(String effectId) {
+        String id = effectId == null ? "" : effectId.trim();
+        List<Owner> owners = new ArrayList<>();
+        owners.add(owner(Project.MASTER));
+        for (Track t : tracks) {
+            owners.add(owner(t.id()));
+            for (TimelineItem i : items.get(t.id())) {
+                owners.add(ownerOf(new Located(t, i)));
+            }
+        }
+        List<String> all = new ArrayList<>();
+        for (Owner o : owners) {
+            List<Effect> list = effects(o);
+            for (int k = 0; k < list.size(); k++) {
+                if (list.get(k).id().equals(id)) {
+                    return new EffectRef(o, k, list.get(k));
+                }
+                all.add(list.get(k).id());
+            }
+        }
+        throw new EditException("unknown effect id '" + effectId + "'"
+                + (all.isEmpty() ? "; the project has no effects yet" : "; effects: " + String.join(", ", all)));
+    }
+
+    /** Copies of effects with fresh ids (for split parts). */
+    List<Effect> copyEffects(List<Effect> effects) {
+        return effects.stream().map(e -> e.withId(newId("e"))).toList();
+    }
+
     // ---------------------------------------------------------------- lookups
 
     Track track(String id) {
         if (id == null || id.isBlank()) {
             throw new EditException("track is required; tracks: " + trackList());
         }
-        return base.track(id.trim())
+        return tracks.stream().filter(t -> t.id().equalsIgnoreCase(id.trim())).findFirst()
                 .orElseThrow(() -> new EditException("track '" + id + "' does not exist; tracks: " + trackList()));
     }
 
     String trackList() {
-        return base.tracks().stream()
+        return tracks.stream()
                 .map(t -> t.id() + " (" + t.kind().name().toLowerCase() + ")")
                 .collect(Collectors.joining(", "));
     }
@@ -86,7 +221,7 @@ final class Draft {
         if (itemId == null) {
             return Optional.empty();
         }
-        for (Track t : base.tracks()) {
+        for (Track t : tracks) {
             for (TimelineItem i : items.get(t.id())) {
                 if (i.id().equals(itemId.trim())) {
                     return Optional.of(new Located(t, i));
@@ -211,8 +346,8 @@ final class Draft {
     // ---------------------------------------------------------------- build
 
     Project build() {
-        List<Track> tracks = base.tracks().stream().map(t -> t.withItems(items.get(t.id()))).toList();
-        return new Project(base.file(), base.profile(), bin, tracks, transitions, nextId, base.meta());
+        List<Track> built = tracks.stream().map(t -> t.withItems(items.get(t.id()))).toList();
+        return new Project(base.file(), base.profile(), bin, built, transitions, nextId, base.meta(), masterEffects);
     }
 
     static String abbreviate(String s) {

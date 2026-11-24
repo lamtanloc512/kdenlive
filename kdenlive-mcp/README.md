@@ -18,7 +18,7 @@ release and trimmed to `melt`, `ffmpeg`, `ffprobe`, the MLT modules kdenlive-mcp
 | Archive | Platform | Size | Unpacked |
 |---|---|---|---|
 | `kdenlive-mcp-tools-linux-x64.tar.xz` | Linux x86_64 (from the AppImage) | 45 MB | 154 MB |
-| `kdenlive-mcp-tools-macos-arm64.tar.xz` | macOS Apple Silicon (from the DMG) | 34 MB | 114 MB |
+| `kdenlive-mcp-tools-macos-arm64.tar.xz` | macOS Apple Silicon (from the DMG, all MLT modules) | 45 MB | 192 MB |
 
 ```bash
 scripts/install-tools.sh
@@ -153,16 +153,18 @@ MELT_PATH=~/.kdenlive-mcp/tools/bin/melt ./mvnw verify
 * **No ripple editing.** Items never overlap; an insert or move into an occupied spot is refused, and the error gives the next free position.
 * **One sequence per project.** Projects with several sequences are refused when opened.
 * **Bin clips:** video/audio files and titles (still images are supported but only lightly tested). Color clips, slideshows, nested sequences and proxies are
-  refused when opened. Effects and compositions made in Kdenlive are kept and written back, but cannot be edited.
-* **No keyframes.** Effects are limited to volume, audio fades, fade to black and title fades.
+  refused when opened. Compositions between tracks made in Kdenlive are kept and written back, but cannot be edited yet.
+* **Effects:** every effect in Kdenlive's catalog can be added, set, keyframed and reordered on items, tracks and the
+  master (see docs/tools.md). Effects made in Kdenlive are editable too. Complex parameter types (curves, splines,
+  roto masks, gradients) take Kdenlive's raw string format. The Linux tools archive still has only the MLT modules of
+  the first release, so fewer effects render there (macOS has all of them).
 * **`clip_trim` keeps the item's start;** shortening the in point does not move the clip.
 * **Dissolves need spare media around the cut,** like Kdenlive's own mixes. The error says how to trim to make room.
 * **Kdenlive doesn't notice when the file changes.** Reopen the project there after Claude edits it, and don't edit the same project in both at once.
 * **Variable-frame-rate media can drift by a frame** (`media_import` warns). Rotation metadata is shown but not corrected.
 * **`media_contact_sheet` labels need an ffmpeg with `drawtext`.** The bundled ffmpeg has none, so the tiles are unlabelled and the caption lists the times in order. Timeline `contact_sheet` labels come from melt and always work.
-* **Untested on macOS so far.** The macOS tools archive was cut from Kdenlive's arm64 DMG on Linux, with its
-  dependency closure computed from the Mach-O load commands; every binary is unmodified and keeps its signature.
-  It has not been run on a Mac yet. Please report what `server_check` prints there.
+* **macOS tools** are built on a Mac by `scripts/build-macos-tools.sh` from Kdenlive.app (unmodified binaries, valid
+  signatures, every MLT module); verified on macOS arm64 with Kdenlive 26.08.3.
 * **Single client.** One open project per server process; renders run one at a time.
 
 ## 8. Layout
@@ -175,5 +177,6 @@ src/main/java/dev/kdenlivemcp/
   tools/      finding melt/ffmpeg/ffprobe                         mcp/      thin MCP tool classes
 fixtures/     projects written by Kdenlive 26.08.3 (test oracles)
 docs/         kdenlive-format.md, tools.md, PLAN.md
-scripts/      install-tools.sh
+scripts/      install-tools.sh, build-macos-tools.sh, sync-kdenlive-assets.sh
+src/main/resources/kdenlive-assets/   Kdenlive's effect/transition definitions (CC0), synced from ../data
 ```

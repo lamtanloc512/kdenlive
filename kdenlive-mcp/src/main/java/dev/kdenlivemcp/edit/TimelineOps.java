@@ -206,9 +206,10 @@ public final class TimelineOps {
         String summary;
         switch (item) {
             case TitleItem t -> {
-                d.replace(new TitleItem(t.id(), t.text(), t.styleId(), t.start(), at - t.start(), t.fadeIn(), 0, t.extras()));
+                d.replace(new TitleItem(t.id(), t.text(), t.styleId(), t.start(), at - t.start(), t.fadeIn(), 0, t.extras(),
+                        t.effects()));
                 d.put(loc.track().id(), new TitleItem(rightId, t.text(), t.styleId(), at, t.end() - at, 0, t.fadeOut(),
-                        t.extras()));
+                        t.extras(), d.copyEffects(t.effects())));
                 summary = "split " + d.describe(t) + " at " + d.sec(at) + " into " + t.id() + " and " + rightId;
             }
             case ClipItem c -> {
@@ -240,10 +241,12 @@ public final class TimelineOps {
         long leftLen = at - c.start();
         AudioSettings a = c.audio();
         ClipItem left = new ClipItem(c.id(), c.mediaId(), c.start(), c.in(), leftLen, c.linkId(),
-                new AudioSettings(a.volumeDb(), Math.min(a.fadeIn(), leftLen), 0), c.extras());
+                new AudioSettings(a.volumeDb(), Math.min(a.fadeIn(), leftLen), 0), c.extras(), c.effects());
         long rightLen = c.length() - leftLen;
+        // keyframes are in source frames, so both halves keep the same animation
         ClipItem right = new ClipItem(rightId, c.mediaId(), at, c.in() + leftLen, rightLen, rightLink,
-                new AudioSettings(a.volumeDb(), 0, Math.min(a.fadeOut(), rightLen)), c.extras());
+                new AudioSettings(a.volumeDb(), 0, Math.min(a.fadeOut(), rightLen)), c.extras(),
+                d.copyEffects(c.effects()));
         d.replace(left);
         d.put(trackId, right);
     }

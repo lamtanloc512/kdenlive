@@ -7,6 +7,7 @@ import dev.kdenlivemcp.model.AudioSettings;
 import dev.kdenlivemcp.model.ClipItem;
 import dev.kdenlivemcp.model.DocumentMeta;
 import dev.kdenlivemcp.model.EditException;
+import dev.kdenlivemcp.model.Effect;
 import dev.kdenlivemcp.model.Extras;
 import dev.kdenlivemcp.model.FadeToBlack;
 import dev.kdenlivemcp.model.Fps;
@@ -210,6 +211,7 @@ public final class KdenliveReader {
         List<Extras> trackExtras = new ArrayList<>();
         List<List<Raw>> perTrack = new ArrayList<>();
         List<Element[]> mixes = new ArrayList<>(); // {transition, trackTractor}
+        List<List<Element>> trackEffectEls = new ArrayList<>();
         for (int i = 0; i < trackEls.size(); i++) {
             Element tr = trackEls.get(i);
             List<Raw> items = readTrackItems(tr, i);
@@ -222,11 +224,17 @@ public final class KdenliveReader {
                 }
             });
             List<String> extraXml = new ArrayList<>();
+            List<Element> fxEls = new ArrayList<>();
             for (Element f : Xml.children(tr, "filter")) {
                 if (Xml.prop(f, "internal_added") == null) {
-                    extraXml.add(Xml.toString(f, false));
+                    if (isEffect(f)) {
+                        fxEls.add(f);
+                    } else {
+                        extraXml.add(Xml.toString(f, false));
+                    }
                 }
             }
+            trackEffectEls.add(fxEls);
             for (Element t : Xml.children(tr, "transition")) {
                 if (Xml.prop(t, "kdenlive:mixcut") != null) {
                     mixes.add(new Element[] {t, tr});
@@ -321,8 +329,12 @@ public final class KdenliveReader {
             String hide = Xml.children(tr, "track").isEmpty() ? "" : Xml.children(tr, "track").getFirst().getAttribute("hide");
             boolean both = "both".equals(hide);
             boolean locked = "1".equals(Xml.prop(tr, "kdenlive:locked_track"));
+            List<Effect> trackFx = new ArrayList<>();
+            for (Element f : trackEffectEls.get(i)) {
+                trackFx.add(effectFrom(f, names.get(i) + "#" + trackFx.size()));
+            }
             tracks.add(new Track(names.get(i), kind, items, kind == TrackKind.AUDIO && both,
-                    kind == TrackKind.VIDEO && both, locked, trackExtras.get(i)));
+                    kind == TrackKind.VIDEO && both, locked, trackExtras.get(i), trackFx));
         }
 
         // document-level passthrough
@@ -344,9 +356,14 @@ public final class KdenliveReader {
                 seqXml.add(Xml.toString(t, false));
             }
         }
+        List<Effect> master = new ArrayList<>();
         for (Element f : Xml.children(seq, "filter")) {
             if (Xml.prop(f, "internal_added") == null) {
-                seqXml.add(Xml.toString(f, false));
+                if (isEffect(f)) {
+                    master.add(effectFrom(f, Project.MASTER + "#" + master.size()));
+                } else {
+                    seqXml.add(Xml.toString(f, false));
+                }
             }
         }
         String uuid = Xml.prop(seq, "kdenlive:uuid");
@@ -356,7 +373,7 @@ public final class KdenliveReader {
         DocumentMeta meta = new DocumentMeta(uuid,
                 binProps.getOrDefault("kdenlive:docproperties.documentid", Long.toString(System.currentTimeMillis())),
                 new Extras(metaProps, seqXml));
-        return new Project(file, profile, media, tracks, transitions, nextId, meta);
+        return new Project(file, profile, media, tracks, transitions, nextId, meta, master);
     }
 
     // ------------------------------------------------------------------ pieces
@@ -482,6 +499,7 @@ public final class KdenliveReader {
         long fadeIn = 0;
         long fadeOut = 0;
         List<String> passthrough = new ArrayList<>();
+        List<Effect> effects = new ArrayList<>();
         for (Element f : Xml.children(r.entry, "filter")) {
             String kid = Xml.prop(f, "kdenlive_id");
             long fin = f.hasAttribute("in") ? MltTime.parse(f.getAttribute("in"), fps) : 0;
@@ -499,6 +517,8 @@ public final class KdenliveReader {
                 fadeOut = fout - fin;
             } else if ("fade_from_black".equals(kid) && r.isTitle() && alpha != null && alpha.contains(";")) {
                 fadeIn = fout - fin;
+            } else if (isEffect(f)) {
+                effects.add(effectFrom(f, r.id + "#" + effects.size()));
             } else {
                 passthrough.add(Xml.toString(f, false));
             }
@@ -510,11 +530,11 @@ public final class KdenliveReader {
             if (!style.isEmpty() && !style.equals(TitleItem.EXTERNAL)) {
                 return new TitleItem(r.id, meta.path("text").asText(""), style, r.start, r.length,
                         meta.path("fadeIn").asLong(fadeIn), meta.path("fadeOut").asLong(fadeOut),
-                        new Extras(Map.of(), passthrough));
+                        new Extras(Map.of(), passthrough), effects);
             }
             String text = props.containsKey("xmldata") ? TitleXml.textOf(props.get("xmldata")) : titleTextFromFile(props);
             return new TitleItem(r.id, text, TitleItem.EXTERNAL, r.start, r.length, fadeIn, fadeOut,
-                    new Extras(props, passthrough));
+                    new Extras(props, passthrough), effects);
         }
         MediaClip m = mediaByBin.get(r.binId);
         if (m == null) {
@@ -522,7 +542,7 @@ public final class KdenliveReader {
                     + " which is not a file clip kdenlive-mcp supports");
         }
         return new ClipItem(r.id, m.id(), r.start, r.in, r.length, r.linkId,
-                new AudioSettings(volume, fadeIn, fadeOut), new Extras(Map.of(), passthrough));
+                new AudioSettings(volume, fadeIn, fadeOut), new Extras(Map.of(), passthrough), effects);
     }
 
     private String titleTextFromFile(Map<String, String> props) {
@@ -538,33 +558,46 @@ public final class KdenliveReader {
         }
     }
 
+    // ------------------------------------------------------------------ effects
+
+    /** A user effect: Kdenlive tags every effect it creates with kdenlive_id. */
+    private static boolean isEffect(Element filter) {
+        String kid = Xml.prop(filter, Effect.KDENLIVE_ID);
+        return kid != null && !kid.isBlank() && Xml.prop(filter, Effect.SERVICE) != null;
+    }
+
+    private Effect effectFrom(Element f, String key) {
+        Long in = f.hasAttribute("in") ? MltTime.parse(f.getAttribute("in"), fps) : null;
+        Long out = f.hasAttribute("out") ? MltTime.parse(f.getAttribute("out"), fps) : null;
+        return new Effect(effectId(key), Xml.properties(f), in, out);
+    }
+
     // ------------------------------------------------------------------ ids
 
     private String mediaId(int binId) {
-        String id = idMap.path("media").path(Integer.toString(binId)).asText("");
-        if (id.startsWith("m") && usedIds.add(id)) {
-            bump(id);
-            return id;
-        }
-        return newId("m");
+        return storedId("media", Integer.toString(binId), "m");
     }
 
     private String idFor(String key, String prefix) {
-        String id = idMap.path("items").path(key).asText("");
+        return storedId("items", key, prefix);
+    }
+
+    private String transitionId(String key) {
+        return storedId("transitions", key, "x");
+    }
+
+    private String effectId(String key) {
+        return storedId("effects", key, "e");
+    }
+
+    /** The id we saved for this key in the id map, if still free, else a new one. */
+    private String storedId(String section, String key, String prefix) {
+        String id = idMap.path(section).path(key).asText("");
         if (id.startsWith(prefix) && usedIds.add(id)) {
             bump(id);
             return id;
         }
         return newId(prefix);
-    }
-
-    private String transitionId(String key) {
-        String id = idMap.path("transitions").path(key).asText("");
-        if (id.startsWith("x") && usedIds.add(id)) {
-            bump(id);
-            return id;
-        }
-        return newId("x");
     }
 
     private String newId(String prefix) {

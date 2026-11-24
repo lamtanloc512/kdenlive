@@ -85,7 +85,8 @@ public class KdenliveXmlBackend implements EditorBackend {
             }
             refreshed.add(clip);
         }
-        return new Project(p.file(), p.profile(), refreshed, p.tracks(), p.transitions(), p.nextId(), p.meta());
+        return new Project(p.file(), p.profile(), refreshed, p.tracks(), p.transitions(), p.nextId(), p.meta(),
+                p.masterEffects());
     }
 
     @Override
@@ -316,11 +317,18 @@ public class KdenliveXmlBackend implements EditorBackend {
                 ProcessRunner.Result r = ProcessRunner.run(List.of(melt.get().path().toString(), "kdenlivetitle:" + title,
                         "out=0", "-consumer", "null"), Duration.ofSeconds(30), meltEnv(melt.get()), dir);
                 String all = r.stdout() + r.stderr();
-                result = all.contains("X11") || all.contains("INVALID")
-                        ? Optional.of("this melt's Qt module needs an X11 display and none is available (titles would "
-                        + "render as 'INVALID'). Use Kdenlive's bundled melt (MLT >= 7.30) via MELT_PATH, or run "
-                        + "with a display (e.g. xvfb-run)")
-                        : Optional.empty();
+                if (all.contains("X11") || all.contains("INVALID")) {
+                    result = Optional.of("this melt's Qt module needs an X11 display and none is available (titles "
+                            + "would render as 'INVALID'). Use Kdenlive's bundled melt (MLT >= 7.30) via MELT_PATH, or "
+                            + "run with a display (e.g. xvfb-run)");
+                } else if (!r.ok()) {
+                    // e.g. Qt aborting because its platform plugin is missing (set QT_QPA_PLATFORM=offscreen)
+                    result = Optional.of("melt failed to render a test title ("
+                            + (r.timedOut() ? "timed out" : "exit " + r.exitCode()) + "): "
+                            + (r.stderrTail(5) + "\n" + ProcessRunner.tail(r.stdout(), 5)).strip());
+                } else {
+                    result = Optional.empty();
+                }
             } catch (IOException e) {
                 result = Optional.of("cannot check title rendering: " + e.getMessage());
             } finally {

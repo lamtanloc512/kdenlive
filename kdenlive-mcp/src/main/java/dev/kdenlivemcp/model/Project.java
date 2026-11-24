@@ -10,16 +10,26 @@ import java.util.Optional;
  *
  * @param file where the project is saved (.kdenlive)
  * @param tracks in display order, top to bottom (e.g. V2, V1, A1, A2)
- * @param nextId counter for new short ids (m1, c2, t3, x4 share one sequence)
+ * @param nextId counter for new short ids (m1, c2, t3, x4, e5 share one sequence)
  * @param meta document-level data (uuid, ids, unmodelled settings)
+ * @param masterEffects effects on the whole sequence (Kdenlive's "master" effects), applied after the tracks mix
  */
 public record Project(Path file, Profile profile, List<MediaClip> bin, List<Track> tracks,
-                      List<Transition> transitions, long nextId, DocumentMeta meta) {
+                      List<Transition> transitions, long nextId, DocumentMeta meta, List<Effect> masterEffects) {
+
+    /** Owner key of master effects in effect locations and the id map. */
+    public static final String MASTER = "master";
 
     public Project {
         bin = List.copyOf(bin);
         tracks = List.copyOf(tracks);
         transitions = List.copyOf(transitions);
+        masterEffects = masterEffects == null ? List.of() : List.copyOf(masterEffects);
+    }
+
+    public Project(Path file, Profile profile, List<MediaClip> bin, List<Track> tracks, List<Transition> transitions,
+                   long nextId, DocumentMeta meta) {
+        this(file, profile, bin, tracks, transitions, nextId, meta, List.of());
     }
 
     public Fps fps() {
@@ -40,6 +50,6 @@ public record Project(Path file, Profile profile, List<MediaClip> bin, List<Trac
     }
 
     public Project withFile(Path newFile) {
-        return new Project(newFile, profile, bin, tracks, transitions, nextId, meta);
+        return new Project(newFile, profile, bin, tracks, transitions, nextId, meta, masterEffects);
     }
 }

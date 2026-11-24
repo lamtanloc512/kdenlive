@@ -4,7 +4,12 @@ These are unmodified files taken from the official Kdenlive 26.08.3 release
 (https://download.kde.org/stable/kdenlive/26.08/ - linux/kdenlive-26.08.3-x86_64.AppImage,
 sha256 2c8322edfc86605e4c98a78a019310d9b4fc46bb8e94e6fe313dc7dd987e7671, and
 macOS/kdenlive-26.08.3-arm64.dmg, sha256 22b385f1e2e5bf45c5bb6954bd58a97db34cead219a9a9ae6faa499f0096d71e),
-reduced to melt, ffmpeg, ffprobe, the MLT modules kdenlive-mcp uses and the libraries they load.
+as melt, ffmpeg and ffprobe plus the libraries they load:
+  * macOS arm64: every MLT module the Kdenlive.app ships (so all of Kdenlive's effects and transitions render), the
+    frei0r and LADSPA plugins, the Qt offscreen platform, Kdenlive's HD lumas and LUTs. Built by
+    scripts/build-macos-tools.sh from the DMG's Kdenlive.app; frameworks keep their code signatures.
+  * Linux x86_64: the MLT modules kdenlive-mcp needed before effects were supported (core, avformat, qt6, kdenlive,
+    plus, xml, normalize, resample); not rebuilt yet.
 Only the small bin/ wrapper scripts were added.
 
 Main components and licenses (see each project for the full terms):
@@ -12,6 +17,11 @@ Main components and licenses (see each project for the full terms):
   FFmpeg 8.1      GPL-2.0+ (this build)            https://ffmpeg.org
   Qt 6            LGPL-3.0                         https://www.qt.io/download-open-source
   Kdenlive 26.08  GPL-3.0 (kdenlive MLT module)    https://invent.kde.org/multimedia/kdenlive
+  frei0r          GPL-2.0+                         https://frei0r.dyne.org
+  OpenCV 4.12     Apache-2.0                       https://opencv.org
+  Rubber Band     GPL-2.0+                         https://breakfastquay.com/rubberband
+  vid.stab        GPL-2.0+                         https://github.com/georgmartius/vid.stab
+  LADSPA plugins  CMT (GPL-2.0+), RNNoise (BSD-3-Clause)
   plus the libraries they link (codecs, fontconfig, freetype, harfbuzz, ...), under their own licenses.
 
 Corresponding source: the Kdenlive release sources and its build recipes (KDE Craft blueprints) at

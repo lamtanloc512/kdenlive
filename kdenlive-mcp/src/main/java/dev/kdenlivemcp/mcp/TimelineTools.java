@@ -22,8 +22,11 @@ public class TimelineTools {
     private final ProjectSession session;
     private final TitlePresets presets;
     private final KdenliveXmlBackend backend;
+    private final dev.kdenlivemcp.assets.AssetCatalog catalog;
 
-    public TimelineTools(ProjectSession session, TitlePresets presets, KdenliveXmlBackend backend) {
+    public TimelineTools(ProjectSession session, TitlePresets presets, KdenliveXmlBackend backend,
+                         dev.kdenlivemcp.assets.AssetCatalog catalog) {
+        this.catalog = catalog;
         this.session = session;
         this.presets = presets;
         this.backend = backend;
@@ -35,11 +38,12 @@ public class TimelineTools {
 
     @Tool(name = "timeline_get", description = """
             The timeline as compact JSON: tracks (top to bottom) with items {id, type, start, end, in, out, name, \
-            link, volumeDb, fades} and transitions. Times in seconds. Example: timeline_get()""",
+            link, volumeDb, fades, effects} and transitions; track and master effects too. Times in seconds. \
+            Example: timeline_get()""",
             annotations = @Tool.Annotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true,
                     openWorldHint = false))
     public String timelineGet() {
-        return ToolSupport.call("timeline_get", () -> Formatters.timelineJson(session.current()));
+        return ToolSupport.call("timeline_get", () -> Formatters.timelineJson(session.current(), catalog));
     }
 
     @Tool(name = "clip_insert", description = """

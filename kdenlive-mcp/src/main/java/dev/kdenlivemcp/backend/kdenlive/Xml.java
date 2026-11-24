@@ -118,6 +118,12 @@ public final class Xml {
     }
 
     public static String toString(Node node, boolean declaration) {
+        if (node instanceof Element e && !declaration) {
+            // fragments: drop indentation text so passthrough XML does not grow on every save
+            Element copy = (Element) e.cloneNode(true);
+            stripWhitespace(copy);
+            node = copy;
+        }
         try {
             Transformer t = TransformerFactory.newInstance().newTransformer();
             t.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, declaration ? "no" : "yes");
@@ -132,9 +138,22 @@ public final class Xml {
         }
     }
 
+    private static void stripWhitespace(Node n) {
+        NodeList kids = n.getChildNodes();
+        for (int i = kids.getLength() - 1; i >= 0; i--) {
+            Node k = kids.item(i);
+            if (k.getNodeType() == Node.TEXT_NODE && k.getTextContent().isBlank() && kids.getLength() > 1) {
+                n.removeChild(k);
+            } else if (k.getNodeType() == Node.ELEMENT_NODE) {
+                stripWhitespace(k);
+            }
+        }
+    }
+
     /** Re-imports a serialized element (passthrough data) under {@code parent}. */
     public static void appendFragment(Element parent, String xml) {
         Element frag = parseString(xml).getDocumentElement();
+        stripWhitespace(frag);
         parent.appendChild(parent.getOwnerDocument().importNode(frag, true));
     }
 

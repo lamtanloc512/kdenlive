@@ -1,8 +1,11 @@
 package dev.kdenlivemcp.config;
 
+import dev.kdenlivemcp.assets.AssetCatalog;
 import dev.kdenlivemcp.backend.EditorBackend;
+import dev.kdenlivemcp.edit.EffectOps;
 import dev.kdenlivemcp.session.ProjectSession;
 import dev.kdenlivemcp.title.TitlePresets;
+import dev.kdenlivemcp.tools.ExternalTools;
 import jakarta.enterprise.inject.Produces;
 import jakarta.inject.Singleton;
 
@@ -22,5 +25,19 @@ public class Beans {
     @Singleton
     ProjectSession projectSession(EditorBackend backend, KdenliveConfig config) {
         return new ProjectSession(p -> backend.save(p, p.file()), config.undoDepth());
+    }
+
+    /** Kdenlive's effect and transition definitions (bundled copies of its data/ XML). */
+    @Produces
+    @Singleton
+    AssetCatalog assetCatalog() {
+        return AssetCatalog.load();
+    }
+
+    /** Catalog plus "does this melt have the filter", queried lazily from melt -query. */
+    @Produces
+    @Singleton
+    EffectOps.Env effectEnv(AssetCatalog catalog, ExternalTools tools) {
+        return new EffectOps.Env(catalog, service -> tools.mltCapabilities().has("filters", service));
     }
 }
