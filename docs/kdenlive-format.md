@@ -200,3 +200,18 @@ Two documents are "the same" after normalization:
    `sequenceproperties.position|scrollPos|zoom|activeTrack|audioTarget|videoTarget`, `kdenlive:activeeffect`,
    `kdenlive:collapsed`, `trackheight`, `kdenlive:locked_track`, `binZoom`, `kdenlive:meta.*`, `kdenlive:kextractor`,
    `kdenlive:record_start_frame*`, `root`, `version`.
+
+## 10. melt pitfalls found while building the backend (MLT 7.43 / 7.22)
+
+| Symptom | Cause | What we do |
+|---|---|---|
+| `melt project.kdenlive in=F out=F` returns the **wrong frame** (or "INVALID") | in/out on a whole Kdenlive document does not seek the sequence correctly | Frame grabs write a snapshot whose project tractor plays only `[F, F]` (`<track in=F out=F>`). |
+| Render **stalls near the end** when scaling (`width=`/`height=` or `s=` on the avformat consumer) | consumer-side resize in melt 7.43 | Draft/scaled renders write the target size into the snapshot's `<profile>` and render natively. |
+| Titles render as **black boxes** | no Qt platform without a display | `QT_QPA_PLATFORM=offscreen` on Linux without `DISPLAY`/`WAYLAND_DISPLAY`. |
+| Titles render as **"INVALID"** with Ubuntu's melt 7.22 | its qt module refuses to run without X11 even with offscreen | `server_check` and `render` warn; use Kdenlive's bundled melt via `MELT_PATH`, or run under `xvfb-run`. |
+| Under parallel load, a 1-frame grab sometimes exits 0 **without writing the PNG** (~1/40) | frame dropping / early stop in melt | `real_time=-1`, and up to 3 attempts. |
+| Fade-in filters | Kdenlive omits `in` when it is 0 | The writer does the same, so a Kdenlive re-save is identical. |
+
+Verified end to end: a project generated through the MCP tools (`demo-edit/halo-promo.kdenlive`, 6 clips, 5 mixes,
+3 titles, audio bed with fades, fade to black) opens in Kdenlive 26.08.3 without errors, and Kdenlive's re-save
+has the same semantic summary as our file.

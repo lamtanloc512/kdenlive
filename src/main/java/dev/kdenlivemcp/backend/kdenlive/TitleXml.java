@@ -38,7 +38,15 @@ public final class TitleXml {
         root.setAttribute("height", Integer.toString(h));
         root.setAttribute("out", Long.toString(lengthFrames));
         root.setAttribute("LC_NUMERIC", "C");
-        Element item = Xml.el(root, "item", "type", "QGraphicsTextItem", "z-index", "0");
+        if (style.box() != null) {
+            double pad = size * 0.35;
+            Element band = Xml.el(root, "item", "type", "QGraphicsRectItem", "z-index", "0");
+            Element bpos = Xml.el(band, "position", "x", "0", "y", num(y - pad));
+            Xml.el(bpos, "transform").setTextContent("1,0,0,0,1,0,0,0,1");
+            Xml.el(band, "content", "rect", "0,0," + w + "," + num(boxHeight + 2 * pad), "pencolor", "0,0,0,0",
+                    "penwidth", "0", "brushcolor", style.box());
+        }
+        Element item = Xml.el(root, "item", "type", "QGraphicsTextItem", "z-index", "1");
         Element pos = Xml.el(item, "position", "x", "0", "y", num(y));
         Xml.el(pos, "transform").setTextContent("1,0,0,0,1,0,0,0,1");
         Element content = Xml.el(item, "content",

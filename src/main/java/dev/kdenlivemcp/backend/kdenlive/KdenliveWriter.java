@@ -384,7 +384,7 @@ public final class KdenliveWriter {
     }
 
     private void audioFade(Element entry, String kind, long from, long to) {
-        Element f = filter(entry, clock(Math.max(0, from)), clock(to));
+        Element f = filter(entry, from <= 0 ? null : clock(from), clock(to)); // Kdenlive omits in="0"
         Xml.prop(f, "window", 75);
         Xml.prop(f, "max_gain", "20dB");
         Xml.prop(f, "channel_mask", -1);

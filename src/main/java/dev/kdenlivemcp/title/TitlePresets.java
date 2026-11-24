@@ -62,7 +62,8 @@ public final class TitlePresets {
             map.put(id, new TitleStyle(id, n.path("description").asText(""), n.path("font").asText("DejaVu Sans"),
                     n.path("weight").asInt(400), n.path("size").asInt(64), n.path("color").asText("255,255,255,255"),
                     n.path("outline").asDouble(0), n.path("outlineColor").asText("0,0,0,255"), position,
-                    n.path("fadeIn").asDouble(0), n.path("fadeOut").asDouble(0)));
+                    n.path("fadeIn").asDouble(0), n.path("fadeOut").asDouble(0),
+                    n.hasNonNull("box") && !n.path("box").asText().isBlank() ? n.path("box").asText() : null));
         }
         if (map.isEmpty()) {
             throw new IllegalArgumentException(source + " defines no presets");

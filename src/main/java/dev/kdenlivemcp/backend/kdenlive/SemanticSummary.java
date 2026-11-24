@@ -104,12 +104,14 @@ public final class SemanticSummary {
                     }
                 }
             }
+            TreeSet<String> mixLines = new TreeSet<>(); // order inside the tractor carries no meaning
             for (Element x : Xml.children(tr, "transition")) {
-                out.add("  mix " + MltTime.parse(x.getAttribute("in"), fps) + "-" + MltTime.parse(x.getAttribute("out"), fps)
+                mixLines.add("  mix " + MltTime.parse(x.getAttribute("in"), fps) + "-" + MltTime.parse(x.getAttribute("out"), fps)
                         + " " + Xml.prop(x, "mlt_service") + " cut=" + Xml.prop(x, "kdenlive:mixcut")
                         + " wipe=" + (Xml.prop(x, "resource") != null && !Xml.prop(x, "resource").isBlank())
                         + " reverse=" + Xml.prop(x, "reverse"));
             }
+            out.addAll(mixLines);
             for (Element f : Xml.children(tr, "filter")) {
                 if (Xml.prop(f, "internal_added") == null) {
                     out.add("  trackfx " + Xml.prop(f, "kdenlive_id"));

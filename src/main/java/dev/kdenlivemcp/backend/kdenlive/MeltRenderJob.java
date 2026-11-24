@@ -104,7 +104,7 @@ final class MeltRenderJob implements RenderJob {
             Files.move(tempOutput, output, StandardCopyOption.REPLACE_EXISTING);
             String desc = verify.apply(output);
             percent = 100;
-            message = "done -> " + output + " (" + desc + ") in " + elapsed();
+            message = output + " (" + desc + ") rendered in " + elapsed();
             state = RenderStatus.State.DONE;
             LOG.infof("render %s %s", id, message);
         } catch (InterruptedException e) {

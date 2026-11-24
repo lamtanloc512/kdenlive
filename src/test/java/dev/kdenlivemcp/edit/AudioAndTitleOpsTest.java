@@ -17,9 +17,9 @@ class AudioAndTitleOpsTest {
     private final Project base = TimelineOps.insert(Fixtures.withMedia(), "m1", "V1", 0, null, null, true).project();
     private static final TitlePresets STYLES = new TitlePresets(java.util.Map.of(
             "lower_third", new TitleStyle("lower_third", "", "DejaVu Sans", 700, 72, "255,255,255,255", 2, "0,0,0,200",
-                    "lower_third", 0.3, 0.3),
+                    "lower_third", 0.3, 0.3, null),
             "big_center", new TitleStyle("big_center", "", "DejaVu Sans", 700, 140, "255,255,255,255", 2, "0,0,0,200",
-                    "center", 0, 0)));
+                    "center", 0, 0, null)));
 
     @Test
     void audioSetOnVideoItemGoesToLinkedAudio() {
