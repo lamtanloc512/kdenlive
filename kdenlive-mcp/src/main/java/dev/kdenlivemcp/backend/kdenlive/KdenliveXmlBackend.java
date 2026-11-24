@@ -132,10 +132,13 @@ public class KdenliveXmlBackend implements EditorBackend {
         ResolvedBinary melt = tools.require(Binary.MELT);
         String id = "r" + jobCounter.incrementAndGet();
         Path dir = workDir("render-" + id);
-        Path snapshot = writeSnapshot(project, dir, null, size);
+        // full-size profile: effect and composition geometry is in profile pixels; the consumer scales the output
+        Path snapshot = writeSnapshot(project, dir, null, null);
         Path temp = output.resolveSibling("." + output.getFileName() + ".rendering" + extension(output));
         List<String> cmd = new ArrayList<>(List.of(melt.path().toString(), snapshot.toString(), "-progress",
                 "-consumer", "avformat:" + temp, "real_time=-1"));
+        // melt 7.43 stalls at the end when the consumer resizes, so smaller presets are scaled by ffmpeg afterwards
+        boolean scale = size[0] != project.profile().width() || size[1] != project.profile().height();
         cmd.addAll(spec.preset().consumerArgs);
         if (name.endsWith(".mp4") || name.endsWith(".mov")) {
             cmd.add("movflags=+faststart");
@@ -145,7 +148,12 @@ public class KdenliveXmlBackend implements EditorBackend {
         Path log = logDir().resolve("render-" + id + ".log");
         double expected = project.fps().seconds(project.duration());
         MeltRenderJob job = new MeltRenderJob(id, cmd, meltEnv(melt), temp, output, log, project.duration(), timeout,
-                file -> describeOutput(file, expected));
+                file -> {
+                    if (scale) {
+                        downscale(file, size[0], size[1], spec.preset() == RenderPreset.DRAFT_540P ? 23 : 18);
+                    }
+                    return describeOutput(file, expected);
+                });
         jobs.put(id, job);
         job.start();
         return job;
@@ -157,6 +165,23 @@ public class KdenliveXmlBackend implements EditorBackend {
 
     public List<String> jobIds() {
         return List.copyOf(jobs.keySet());
+    }
+
+    private void downscale(Path file, int w, int h, int crf) {
+        ResolvedBinary ffmpeg = tools.require(Binary.FFMPEG);
+        Path tmp = file.resolveSibling("." + file.getFileName() + ".scaled" + extension(file));
+        ProcessRunner.Result r = ProcessRunner.run(List.of(ffmpeg.path().toString(), "-v", "error", "-y", "-i",
+                file.toString(), "-vf", "scale=" + w + ":" + h + ":flags=lanczos", "-c:v", "libx264", "-preset", "fast",
+                "-crf", Integer.toString(crf), "-pix_fmt", "yuv420p", "-c:a", "copy", "-movflags", "+faststart",
+                tmp.toString()), Duration.ofSeconds(Math.max(120, config.renderMinTimeout())), Map.of(), null);
+        try {
+            if (!r.ok() || !Files.isRegularFile(tmp)) {
+                throw new IllegalStateException("scaling to " + w + "x" + h + " failed: " + r.stderrTail(3));
+            }
+            Files.move(tmp, file, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException e) {
+            throw new IllegalStateException("cannot replace " + file + ": " + e.getMessage());
+        }
     }
 
     private String describeOutput(Path file, double expectedSeconds) {
@@ -208,7 +233,9 @@ public class KdenliveXmlBackend implements EditorBackend {
             Path png = dir.resolve("frame.png");
             int w = even(Math.min(maxWidth, project.profile().width()));
             int h = even((double) project.profile().height() * w / project.profile().width());
-            Path snapshot = writeSnapshot(project, dir, new long[] {frame, frame}, new int[] {w, h});
+            // full-size profile, scaled by the consumer: effect/composition geometry (Transform rects, ...) is in
+            // profile pixels, so shrinking the profile itself would zoom and shift it
+            Path snapshot = writeSnapshot(project, dir, new long[] {frame, frame}, null);
             List<String> cmd = new ArrayList<>(List.of(melt.path().toString(), "-quiet", snapshot.toString()));
             if (label != null && tools.mltCapabilities().has("filters", "dynamictext")) {
                 int size = Math.max(14, h / 18);
@@ -217,7 +244,8 @@ public class KdenliveXmlBackend implements EditorBackend {
                         "bgcolour=0x000000aa", "pad=" + Math.max(4, size / 4)));
             }
             // real_time=-1: never drop the (only) frame when the machine is busy
-            cmd.addAll(List.of("-consumer", "avformat:" + png, "vcodec=png", "update=1", "real_time=-1"));
+            cmd.addAll(List.of("-consumer", "avformat:" + png, "vcodec=png", "update=1", "real_time=-1",
+                    "width=" + w, "height=" + h));
             ProcessRunner.Result r = null;
             // melt occasionally exits 0 without writing anything under parallel load (seen ~1/40 with 7.43): retry
             for (int attempt = 1; attempt <= 3; attempt++) {
