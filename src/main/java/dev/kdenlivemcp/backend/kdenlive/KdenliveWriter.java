@@ -78,6 +78,11 @@ public final class KdenliveWriter {
     private final Map<String, Placed> placedById = new HashMap<>();
     private final Map<String, Integer> trackIndexOfItem = new HashMap<>();
 
+    /** Optional [from, to] frame range for the project tractor (frame grabs, partial renders). */
+    private long[] playRange;
+    /** Optional {width, height} written into the profile, to render a smaller copy natively. */
+    private int[] outputSize;
+
     private KdenliveWriter(Project p, TitlePresets presets) {
         this.p = p;
         this.fps = p.fps();
@@ -89,7 +94,25 @@ public final class KdenliveWriter {
     }
 
     public static Output write(Project project, TitlePresets presets) {
+        return write(project, presets, null);
+    }
+
+    /**
+     * @param playRange {from, to} (inclusive frames) to make melt play only part of the timeline, or null.
+     *                  Seeking with melt's in=/out= on a whole document picks wrong frames; this does not.
+     */
+    public static Output write(Project project, TitlePresets presets, long[] playRange) {
+        return write(project, presets, playRange, null);
+    }
+
+    /**
+     * @param outputSize {width, height} to put in the profile so melt renders at that size natively. Resizing in
+     *                   the consumer (width=/height=/s=) makes melt 7.43 stall near the end of the render.
+     */
+    public static Output write(Project project, TitlePresets presets, long[] playRange, int[] outputSize) {
         KdenliveWriter w = new KdenliveWriter(project, presets);
+        w.playRange = playRange;
+        w.outputSize = outputSize;
         w.build();
         return new Output(Xml.toString(w.doc, true), w.titleFiles);
     }
@@ -127,11 +150,12 @@ public final class KdenliveWriter {
             binChains.put(m.id(), writeMediaProducer(m, null));
         }
         writeMainBin(binChains, duration);
+        long from = playRange == null ? 0 : playRange[0];
+        long to = playRange == null ? Math.max(0, duration - 1) : playRange[1];
         Element project = Xml.el(mlt, "tractor", "id", "tractor" + tractorN++, "in", clock(0),
-                "out", clock(Math.max(0, duration - 1)));
+                "out", clock(to - from));
         Xml.prop(project, "kdenlive:projectTractor", 1);
-        Xml.el(project, "track", "in", clock(0), "out", clock(Math.max(0, duration - 1)),
-                "producer", p.meta().sequenceUuid());
+        Xml.el(project, "track", "in", clock(from), "out", clock(to), "producer", p.meta().sequenceUuid());
     }
 
     private void writeProfile() {
@@ -143,11 +167,11 @@ public final class KdenliveWriter {
                 "display_aspect_num", Integer.toString(pr.displayAspectNum()),
                 "frame_rate_den", Integer.toString(fps.den()),
                 "frame_rate_num", Integer.toString(fps.num()),
-                "height", Integer.toString(pr.height()),
+                "height", Integer.toString(outputSize == null ? pr.height() : outputSize[1]),
                 "progressive", pr.progressive() ? "1" : "0",
                 "sample_aspect_den", Integer.toString(pr.sampleAspectDen()),
                 "sample_aspect_num", Integer.toString(pr.sampleAspectNum()),
-                "width", Integer.toString(pr.width()));
+                "width", Integer.toString(outputSize == null ? pr.width() : outputSize[0]));
     }
 
     private List<Track> bottomUp() {

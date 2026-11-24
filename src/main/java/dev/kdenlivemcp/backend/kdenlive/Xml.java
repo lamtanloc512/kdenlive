@@ -145,6 +145,14 @@ public final class Xml {
             Files.createDirectories(dir);
             Path tmp = Files.createTempFile(dir, "." + file.getFileName(), ".tmp");
             Files.writeString(tmp, content);
+            try { // temp files are created 0600; keep the usual rw-r--r-- (or the existing file's mode)
+                java.util.Set<java.nio.file.attribute.PosixFilePermission> perms = Files.exists(file)
+                        ? Files.getPosixFilePermissions(file)
+                        : java.nio.file.attribute.PosixFilePermissions.fromString("rw-r--r--");
+                Files.setPosixFilePermissions(tmp, perms);
+            } catch (UnsupportedOperationException | IOException ignored) {
+                // non-POSIX file system (Windows)
+            }
             try {
                 Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
             } catch (AtomicMoveNotSupportedException e) {

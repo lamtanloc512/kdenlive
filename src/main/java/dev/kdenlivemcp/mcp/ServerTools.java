@@ -15,10 +15,13 @@ public class ServerTools {
 
     private final ExternalTools tools;
     private final KdenliveConfig config;
+    private final dev.kdenlivemcp.backend.kdenlive.KdenliveXmlBackend backend;
 
-    public ServerTools(ExternalTools tools, KdenliveConfig config) {
+    public ServerTools(ExternalTools tools, KdenliveConfig config,
+                       dev.kdenlivemcp.backend.kdenlive.KdenliveXmlBackend backend) {
         this.tools = tools;
         this.config = config;
+        this.backend = backend;
     }
 
     @Tool(name = "server_check",
@@ -49,6 +52,7 @@ public class ServerTools {
             sb.append(" (titles will not render: use the melt bundled with Kdenlive, which has the qt module)");
         }
         sb.append('\n');
+        sb.append("title rendering: ").append(backend.titleRenderingProblem().orElse("ok")).append('\n');
         sb.append("work dir: ").append(config.workDir()).append('\n');
         sb.append("log dir: ").append(config.logDir());
         return sb.toString();

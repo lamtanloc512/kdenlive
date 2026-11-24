@@ -33,4 +33,9 @@ public interface KdenliveConfig {
 
     @WithDefault("200")
     int undoDepth();
+
+    Optional<String> titlePresets();
+
+    @WithDefault("4")
+    int previewParallelism();
 }
