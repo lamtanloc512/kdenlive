@@ -68,6 +68,10 @@ class EndToEndToolsTest {
                 MEDIA.resolve("testsrc.mp4").toString(), MEDIA.resolve("music.m4a").toString()));
         assertThat(imported).contains("m1: bars.mp4 6.000s 1920x1080@30", "m3: music.m4a 12.000s audio:aac");
 
+        BufferedImage scout = image(media.mediaContactSheet("m2", null, null, 8));
+        assertThat(scout.getWidth()).isGreaterThan(4 * PreviewTools.TILE_WIDTH);
+        assertThatThrownBy(() -> media.mediaContactSheet("m3", null, null, 8)).hasMessageContaining("audio only");
+
         assertThat(timeline.clipInsert("m1", "V1", 0, 0.0, 5.0, true)).contains("inserted c4", "audio part c5 on A1");
         assertThat(timeline.clipInsert("m2", "V1", 5, 1.0, 6.0, true)).contains("inserted c6");
         assertThat(timeline.titleAdd("Hello", 0.5, 3, "V2", "lower_third")).contains("added title t8");

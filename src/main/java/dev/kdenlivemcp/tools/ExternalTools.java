@@ -103,6 +103,10 @@ public class ExternalTools {
     private static List<Candidate> candidates(Binary binary) {
         List<Candidate> list = new ArrayList<>();
         String home = System.getProperty("user.home");
+        // installed by scripts/install-tools.sh (official Kdenlive build)
+        String toolsDir = System.getenv("KDENLIVE_MCP_TOOLS");
+        list.add(new Candidate(Path.of(toolsDir != null ? toolsDir : home + "/.kdenlive-mcp/tools", "bin", binary.exe),
+                "kdenlive-mcp tools"));
         if (isMac()) {
             for (String app : List.of("/Applications/kdenlive.app", "/Applications/Kdenlive.app",
                     home + "/Applications/kdenlive.app", home + "/Applications/Kdenlive.app")) {

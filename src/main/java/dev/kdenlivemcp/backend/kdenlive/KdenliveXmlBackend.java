@@ -279,25 +279,10 @@ public class KdenliveXmlBackend implements EditorBackend {
             if (!errors.isEmpty()) {
                 throw errors.getFirst();
             }
-            for (int i = 0; i < count; i++) {
-                Files.write(dir.resolve(String.format(Locale.ROOT, "f%03d.png", i)), images[i]);
-            }
-            int cols = Math.min(4, count);
-            int rows = (count + cols - 1) / cols;
-            Path sheet = dir.resolve("sheet.png");
-            ProcessRunner.Result r = ProcessRunner.run(List.of(ffmpeg.path().toString(), "-v", "error", "-y",
-                    "-framerate", "1", "-i", dir.resolve("f%03d.png").toString(),
-                    "-vf", "tile=" + cols + "x" + rows + ":padding=6:margin=6:color=0x202020",
-                    "-frames:v", "1", "-update", "1", sheet.toString()), Duration.ofSeconds(60), ffmpeg.env(), dir);
-            if (!r.ok() || !Files.isRegularFile(sheet)) {
-                throw new EditException("ffmpeg could not build the contact sheet: " + r.stderrTail(5).strip());
-            }
-            return Files.readAllBytes(sheet);
+            return dev.kdenlivemcp.media.ImageTiler.tile(ffmpeg, dir, java.util.Arrays.asList(images));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new EditException("interrupted");
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
         } finally {
             deleteTree(dir);
         }

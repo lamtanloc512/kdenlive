@@ -1,5 +1,11 @@
 # kdenlive-mcp: Phase 0 report and plan
 
+> **Status (2026-11-24):** Phases 0–1e are done. The format was learned from projects written by Kdenlive 26.08.3,
+> and generated projects round-trip through Kdenlive unchanged. All tools are implemented, plus `server_check`,
+> `render_cancel` and `media_contact_sheet`. The JVM and native builds work. `scripts/install-tools.sh` installs
+> melt/ffmpeg/ffprobe from the official Kdenlive release. Not yet verified on macOS.
+> See README.md for usage and the known limitations; the sections below are the original plan, kept for reference.
+
 ## 1. Versions and API (checked on Maven Central, 2026-11-24)
 
 | Item | Choice | Note |

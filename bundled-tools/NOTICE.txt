@@ -1,0 +1,19 @@
+Third-party binaries for kdenlive-mcp
+=====================================
+These are unmodified files taken from the official Kdenlive 26.08.3 release
+(https://download.kde.org/stable/kdenlive/26.08/ - linux/kdenlive-26.08.3-x86_64.AppImage,
+sha256 2c8322edfc86605e4c98a78a019310d9b4fc46bb8e94e6fe313dc7dd987e7671, and
+macOS/kdenlive-26.08.3-arm64.dmg, sha256 22b385f1e2e5bf45c5bb6954bd58a97db34cead219a9a9ae6faa499f0096d71e),
+reduced to melt, ffmpeg, ffprobe, the MLT modules kdenlive-mcp uses and the libraries they load.
+Only the small bin/ wrapper scripts were added.
+
+Main components and licenses (see each project for the full terms):
+  MLT 7.43        LGPL-2.1+ / GPL (some modules)   https://github.com/mltframework/mlt
+  FFmpeg 8.1      GPL-2.0+ (this build)            https://ffmpeg.org
+  Qt 6            LGPL-3.0                         https://www.qt.io/download-open-source
+  Kdenlive 26.08  GPL-3.0 (kdenlive MLT module)    https://invent.kde.org/multimedia/kdenlive
+  plus the libraries they link (codecs, fontconfig, freetype, harfbuzz, ...), under their own licenses.
+
+Corresponding source: the Kdenlive release sources and its build recipes (KDE Craft blueprints) at
+https://download.kde.org/stable/kdenlive/26.08/src/ and https://invent.kde.org/packaging/craft-blueprints-kde,
+and the upstream projects above.
