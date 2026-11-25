@@ -124,7 +124,7 @@ public class TimelineTools {
 
     @Tool(name = "title_add", description = """
             Add a text title on a video track (use V2 to overlay video on V1). style is one of the fixed presets \
-            from title-presets.json (font, size, color, position, fades): lower_third, big_center, top_caption, \
+            from title-presets.json (font, size, color, position, fades): lower_third, big_center, top_caption, headline_top, \
             subtitle (call project_summary or try a wrong name to see the current list). Use \\n for line breaks.
             Example: title_add(text="Halo — think harder", at=1, duration=3, track="V2", style="lower_third")""")
     public String titleAdd(

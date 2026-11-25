@@ -244,16 +244,30 @@ public class KdenliveXmlBackend implements EditorBackend {
                         "bgcolour=0x000000aa", "pad=" + Math.max(4, size / 4)));
             }
             // real_time=-1: never drop the (only) frame when the machine is busy
-            cmd.addAll(List.of("-consumer", "avformat:" + png, "vcodec=png", "update=1", "real_time=-1",
-                    "width=" + w, "height=" + h));
+            // full size, scaled below by ffmpeg: consumer-side scaling (width=/height=) drops kdenlivetitle items
+            Path big = dir.resolve("full.png");
+            cmd.addAll(List.of("-consumer", "avformat:" + big, "vcodec=png", "update=1", "real_time=-1"));
             ProcessRunner.Result r = null;
             // melt occasionally exits 0 without writing anything under parallel load (seen ~1/40 with 7.43): retry
             for (int attempt = 1; attempt <= 3; attempt++) {
                 r = ProcessRunner.run(cmd, Duration.ofSeconds(config.frameTimeout()), meltEnv(melt), dir);
-                if (r.ok() && Files.isRegularFile(png)) {
+                if (r.ok() && Files.isRegularFile(big)) {
                     break;
                 }
-                LOG.debugf("frame %d attempt %d: exit %d, png %s", frame, attempt, r.exitCode(), Files.exists(png));
+                LOG.debugf("frame %d attempt %d: exit %d, png %s", frame, attempt, r.exitCode(), Files.exists(big));
+            }
+            if (r.ok() && Files.isRegularFile(big)) {
+                if (w == project.profile().width()) {
+                    Files.move(big, png);
+                } else {
+                    ResolvedBinary ffmpeg = tools.require(Binary.FFMPEG);
+                    ProcessRunner.Result sr = ProcessRunner.run(List.of(ffmpeg.path().toString(), "-v", "error", "-y",
+                            "-i", big.toString(), "-vf", "scale=" + w + ":" + h + ":flags=lanczos", "-frames:v", "1",
+                            "-update", "1", png.toString()), Duration.ofSeconds(config.frameTimeout()), Map.of(), dir);
+                    if (!sr.ok()) {
+                        Files.move(big, png); // full size is still a usable preview
+                    }
+                }
             }
             if (!r.ok() || !Files.isRegularFile(png)) {
                 throw new EditException("melt could not render frame " + frame + (r.timedOut() ? " (timed out)" : "")

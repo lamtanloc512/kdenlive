@@ -20,8 +20,15 @@ public final class TitleXml {
     public static String build(String text, TitleStyle style, Profile profile, long lengthFrames) {
         int w = profile.width();
         int h = profile.height();
-        double scale = h / 1080.0;
+        // presets are sized for 1080p: scale by the short side, so vertical frames don't get 1.78x text
+        double scale = Math.min(w, h) / 1080.0;
         int size = (int) Math.round(style.size() * scale);
+        // shrink lines that would not fit in 92% of the width (bold sans: ~0.62 em per character)
+        int longest = text.lines().mapToInt(l -> l.strip().codePointCount(0, l.strip().length())).max().orElse(1);
+        double fit = w * 0.92 / Math.max(1, longest * 0.62);
+        if (size > fit) {
+            size = (int) Math.floor(fit);
+        }
         double lineHeight = size * 1.25;
         long lines = Math.max(1, text.lines().count());
         double boxHeight = lines * lineHeight;
