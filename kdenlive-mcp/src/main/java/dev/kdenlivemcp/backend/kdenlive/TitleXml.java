@@ -102,7 +102,17 @@ public final class TitleXml {
     /** Width of one line in the title font, measured with the installed font when Java can load it. */
     static double textWidth(String line, String font, int weight, int size) {
         try {
-            java.awt.Font f = new java.awt.Font(font, weight >= 600 ? java.awt.Font.BOLD : java.awt.Font.PLAIN, size);
+            java.awt.Font f = new java.awt.Font(font, weight >= 650 ? java.awt.Font.BOLD : java.awt.Font.PLAIN, size);
+            String named = weight >= 550 && weight < 650 ? font + " SemiBold" : weight >= 450 && weight < 550 ? font + " Medium" : null;
+            if (named != null) {
+                // AWT only knows plain/bold; semibold and medium instances are installed as their own family
+                java.awt.Font n = new java.awt.Font(named, java.awt.Font.PLAIN, size);
+                if (n.getFamily(Locale.ROOT).equalsIgnoreCase(named)) {
+                    f = n;
+                } else {
+                    f = new java.awt.Font(font, java.awt.Font.BOLD, size);
+                }
+            }
             if (!f.getFamily(Locale.ROOT).equalsIgnoreCase(font) && !java.awt.Font.DIALOG.equals(font)) {
                 // fall back to an estimate if the family is not installed (Java would substitute Dialog)
                 if (java.awt.Font.DIALOG.equals(f.getFamily(Locale.ROOT))) {

@@ -72,19 +72,19 @@
     },
     {
       "id": "tiktok_box",
-      "description": "TikTok/Reels caption: bold black sans on white rounded boxes that hug each line",
-      "font": "Inter",
-      "weight": 700,
-      "size": 62,
+      "description": "TikTok/Reels caption: TikTok Sans semibold, black on white rounded boxes that hug each line",
+      "font": "TikTok Sans",
+      "weight": 600,
+      "size": 64,
       "color": "0,0,0,255",
       "outline": 0,
       "outlineColor": "0,0,0,0",
       "position": "center",
       "fadeIn": 0,
-      "fadeOut": 0,
+      "fadeOut": 0.4,
       "box": "255,255,255,255",
       "boxFit": true,
-      "boxRadius": 22
+      "boxRadius": 20
     }
   ]
 }
