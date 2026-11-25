@@ -1,5 +1,5 @@
 {
-  "_comment": "Title styles available to title_add. Edit freely: id (lower_snake_case), font, weight (400 normal, 700 bold), size (px at 1080p, scaled to the project height), color / outlineColor / box as r,g,b,a, outline (px), position (top | center | lower_third | bottom), fadeIn / fadeOut (seconds), box = translucent band behind the text (omit for none).",
+  "_comment": "Title styles available to title_add. Edit freely: id (lower_snake_case), font, weight (400 normal, 700 bold), size (px at 1080p, scaled to the project height), color / outlineColor / box as r,g,b,a, outline (px), position (top | center | lower_third | bottom), fadeIn / fadeOut (seconds), box = translucent band behind the text (omit for none). boxFit=true draws the box as rounded rectangles hugging each line (TikTok/Reels caption), with corner radius boxRadius (px at 1080p).",
   "presets": [
     {
       "id": "lower_third",
@@ -69,6 +69,22 @@
       "fadeIn": 0.2,
       "fadeOut": 0.2,
       "box": "0,0,0,150"
+    },
+    {
+      "id": "tiktok_box",
+      "description": "TikTok/Reels caption: bold black sans on white rounded boxes that hug each line",
+      "font": "Inter",
+      "weight": 700,
+      "size": 62,
+      "color": "0,0,0,255",
+      "outline": 0,
+      "outlineColor": "0,0,0,0",
+      "position": "center",
+      "fadeIn": 0,
+      "fadeOut": 0,
+      "box": "255,255,255,255",
+      "boxFit": true,
+      "boxRadius": 22
     }
   ]
 }

@@ -45,7 +45,28 @@ public final class TitleXml {
         root.setAttribute("height", Integer.toString(h));
         root.setAttribute("out", Long.toString(lengthFrames));
         root.setAttribute("LC_NUMERIC", "C");
-        if (style.box() != null) {
+        if (style.box() != null && style.boxFit()) {
+            // one rounded rectangle per line, hugging the text; neighbouring lines overlap so they merge into one
+            // shape like TikTok / Reels captions
+            double padX = size * 0.42;
+            double padY = size * 0.14;
+            double radius = style.boxRadius() * scale;
+            java.util.List<String> textLines = text.lines().map(String::strip).toList();
+            for (int i = 0; i < textLines.size(); i++) {
+                double lw = textWidth(textLines.get(i), style.font(), style.weight(), size);
+                double bw = lw + 2 * padX;
+                double bx = (w - bw) / 2;
+                double by = y + i * lineHeight - padY;
+                Element band = Xml.el(root, "item", "type", "QGraphicsRectItem", "z-index", "0");
+                Element bpos = Xml.el(band, "position", "x", num(bx), "y", num(by));
+                Xml.el(bpos, "transform").setTextContent("1,0,0,0,1,0,0,0,1");
+                Element c = Xml.el(band, "content", "rect", "0,0," + num(bw) + "," + num(lineHeight + 2 * padY),
+                        "pencolor", "0,0,0,0", "penwidth", "0", "brushcolor", style.box());
+                if (radius > 0) {
+                    c.setAttribute("cornerRadius", num(radius));
+                }
+            }
+        } else if (style.box() != null) {
             double pad = size * 0.35;
             Element band = Xml.el(root, "item", "type", "QGraphicsRectItem", "z-index", "0");
             Element bpos = Xml.el(band, "position", "x", "0", "y", num(y - pad));
@@ -76,6 +97,27 @@ public final class TitleXml {
         Xml.el(root, "endviewport", "rect", "0,0," + w + "," + h);
         Xml.el(root, "background", "color", "0,0,0,0");
         return Xml.toString(doc, false);
+    }
+
+    /** Width of one line in the title font, measured with the installed font when Java can load it. */
+    static double textWidth(String line, String font, int weight, int size) {
+        try {
+            java.awt.Font f = new java.awt.Font(font, weight >= 600 ? java.awt.Font.BOLD : java.awt.Font.PLAIN, size);
+            if (!f.getFamily(Locale.ROOT).equalsIgnoreCase(font) && !java.awt.Font.DIALOG.equals(font)) {
+                // fall back to an estimate if the family is not installed (Java would substitute Dialog)
+                if (java.awt.Font.DIALOG.equals(f.getFamily(Locale.ROOT))) {
+                    return estimate(line, weight, size);
+                }
+            }
+            java.awt.font.FontRenderContext frc = new java.awt.font.FontRenderContext(null, true, true);
+            return f.getStringBounds(line, frc).getWidth();
+        } catch (Throwable e) {
+            return estimate(line, weight, size);
+        }
+    }
+
+    private static double estimate(String line, int weight, int size) {
+        return line.codePointCount(0, line.length()) * size * (weight >= 600 ? 0.6 : 0.52);
     }
 
     private static String num(double v) {
