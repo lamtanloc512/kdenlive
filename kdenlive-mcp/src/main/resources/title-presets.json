@@ -118,6 +118,40 @@
       "marginX": 0.07,
       "fadeIn": 0,
       "fadeOut": 0.4
+    },
+    {
+      "id": "hook_big",
+      "description": "big hook headline in rounded white boxes near the top (first seconds of a short video)",
+      "font": "TikTok Sans",
+      "weight": 700,
+      "size": 84,
+      "color": "0,0,0,255",
+      "outline": 0,
+      "outlineColor": "0,0,0,0",
+      "position": "top",
+      "y": 0.1,
+      "fadeIn": 0,
+      "fadeOut": 0,
+      "box": "255,255,255,255",
+      "boxFit": true,
+      "boxRadius": 24
+    },
+    {
+      "id": "pose_caption",
+      "description": "name of the current move in a rounded white box near the top, no fades (changes on every cut)",
+      "font": "TikTok Sans",
+      "weight": 700,
+      "size": 60,
+      "color": "0,0,0,255",
+      "outline": 0,
+      "outlineColor": "0,0,0,0",
+      "position": "top",
+      "y": 0.12,
+      "fadeIn": 0,
+      "fadeOut": 0,
+      "box": "255,255,255,255",
+      "boxFit": true,
+      "boxRadius": 20
     }
   ]
 }
