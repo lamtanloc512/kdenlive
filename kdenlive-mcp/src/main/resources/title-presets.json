@@ -1,5 +1,5 @@
 {
-  "_comment": "Title styles available to title_add. Edit freely: id (lower_snake_case), font, weight (400 normal, 700 bold), size (px at 1080p, scaled to the project height), color / outlineColor / box as r,g,b,a, outline (px), position (top | center | lower_third | bottom), fadeIn / fadeOut (seconds), box = translucent band behind the text (omit for none). boxFit=true draws the box as rounded rectangles hugging each line (TikTok/Reels caption), with corner radius boxRadius (px at 1080p).",
+  "_comment": "Title styles available to title_add. Edit freely: id (lower_snake_case), font, weight (400 normal, 700 bold), size (px at 1080p, scaled to the project height), color / outlineColor / box as r,g,b,a, outline (px), position (top | center | lower_third | bottom), fadeIn / fadeOut (seconds), box = translucent band behind the text (omit for none). boxFit=true draws the box as rounded rectangles hugging each line (TikTok/Reels caption), with corner radius boxRadius (px at 1080p). align = left | center | right (marginX = side margin as a fraction of the width); y = top of the text as a fraction of the height, overriding position.",
   "presets": [
     {
       "id": "lower_third",
@@ -85,6 +85,39 @@
       "box": "255,255,255,255",
       "boxFit": true,
       "boxRadius": 20
+    },
+    {
+      "id": "tiktok_box_top",
+      "description": "tiktok_box placed near the top of the frame (routine / tutorial headline)",
+      "font": "TikTok Sans",
+      "weight": 600,
+      "size": 50,
+      "color": "0,0,0,255",
+      "outline": 0,
+      "outlineColor": "0,0,0,0",
+      "position": "top",
+      "y": 0.03,
+      "fadeIn": 0,
+      "fadeOut": 0.4,
+      "box": "255,255,255,255",
+      "boxFit": true,
+      "boxRadius": 18
+    },
+    {
+      "id": "list_left",
+      "description": "small bold black left-aligned list under a top headline (exercise list with durations)",
+      "font": "TikTok Sans",
+      "weight": 600,
+      "size": 24,
+      "color": "0,0,0,255",
+      "outline": 2,
+      "outlineColor": "255,255,255,170",
+      "position": "top",
+      "y": 0.108,
+      "align": "left",
+      "marginX": 0.07,
+      "fadeIn": 0,
+      "fadeOut": 0.4
     }
   ]
 }

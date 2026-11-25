@@ -32,7 +32,7 @@ public final class TitleXml {
         double lineHeight = size * 1.25;
         long lines = Math.max(1, text.lines().count());
         double boxHeight = lines * lineHeight;
-        double y = switch (style.position()) {
+        double y = style.y() != null ? h * style.y() : switch (style.position()) {
             case "top" -> h * 0.08;
             case "center" -> (h - boxHeight) / 2;
             case "bottom" -> h * 0.92 - boxHeight;
@@ -74,8 +74,14 @@ public final class TitleXml {
             Xml.el(band, "content", "rect", "0,0," + w + "," + num(boxHeight + 2 * pad), "pencolor", "0,0,0,0",
                     "penwidth", "0", "brushcolor", style.box());
         }
+        double margin = "center".equals(style.align()) ? 0 : Math.round(w * style.marginX());
+        String alignment = switch (style.align()) {
+            case "left" -> "1";   // Qt::AlignLeft
+            case "right" -> "2";  // Qt::AlignRight
+            default -> "4";       // Qt::AlignHCenter
+        };
         Element item = Xml.el(root, "item", "type", "QGraphicsTextItem", "z-index", "1");
-        Element pos = Xml.el(item, "position", "x", "0", "y", num(y));
+        Element pos = Xml.el(item, "position", "x", num(margin), "y", num(y));
         Xml.el(pos, "transform").setTextContent("1,0,0,0,1,0,0,0,1");
         Element content = Xml.el(item, "content",
                 "font", style.font(),
@@ -85,9 +91,9 @@ public final class TitleXml {
                 "font-underline", "0",
                 "letter-spacing", "0",
                 "font-color", style.color(),
-                "box-width", num(w),
+                "box-width", num(w - 2 * margin),
                 "box-height", num(boxHeight),
-                "alignment", "4");
+                "alignment", alignment);
         if (style.outline() > 0) {
             content.setAttribute("font-outline", num(style.outline() * scale));
             content.setAttribute("font-outline-color", style.outlineColor());

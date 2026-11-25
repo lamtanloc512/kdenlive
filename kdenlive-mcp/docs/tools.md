@@ -128,7 +128,7 @@ clip_split(itemId="c4", at=3)
 ```
 
 ### `title_add(text, at, duration, track="V2", style="lower_third")`
-`style` is one of the presets in `title-presets.json`: `lower_third`, `big_center`, `top_caption`, `subtitle`, `headline_top`, `tiktok_box` (black bold text on white rounded boxes that hug each line, like TikTok captions).
+`style` is one of the presets in `title-presets.json`: `lower_third`, `big_center`, `top_caption`, `subtitle`, `headline_top`, `tiktok_box` (black bold text on white rounded boxes that hug each line, like TikTok captions), `tiktok_box_top` (the same near the top) and `list_left` (small left-aligned list under it, e.g. exercises with durations).
 Use `\n` for a line break. Put titles on V2 to overlay the video on V1.
 ```
 title_add(text="Watch it think", at=10.2, duration=3.8, track="V2", style="lower_third")

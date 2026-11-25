@@ -55,6 +55,14 @@ public final class TitlePresets {
             if (id.isBlank() || !id.matches("[a-z0-9_]+")) {
                 throw new IllegalArgumentException(source + ": preset id '" + id + "' must be lower_snake_case");
             }
+            String align = n.path("align").asText("center");
+            if (!Set.of("left", "center", "right").contains(align)) {
+                throw new IllegalArgumentException(source + ": preset " + id + " has align '" + align
+                        + "'; use left, center or right");
+            }
+            if (n.hasNonNull("y") && (n.path("y").asDouble() < 0 || n.path("y").asDouble() > 1)) {
+                throw new IllegalArgumentException(source + ": preset " + id + " has y outside 0..1");
+            }
             if (!POSITIONS.contains(position)) {
                 throw new IllegalArgumentException(source + ": preset " + id + " has position '" + position
                         + "'; use one of " + POSITIONS);
@@ -64,7 +72,8 @@ public final class TitlePresets {
                     n.path("outline").asDouble(0), n.path("outlineColor").asText("0,0,0,255"), position,
                     n.path("fadeIn").asDouble(0), n.path("fadeOut").asDouble(0),
                     n.hasNonNull("box") && !n.path("box").asText().isBlank() ? n.path("box").asText() : null,
-                    n.path("boxFit").asBoolean(false), n.path("boxRadius").asDouble(0)));
+                    n.path("boxFit").asBoolean(false), n.path("boxRadius").asDouble(0), align,
+                    n.path("marginX").asDouble(0.06), n.hasNonNull("y") ? n.path("y").asDouble() : null));
         }
         if (map.isEmpty()) {
             throw new IllegalArgumentException(source + " defines no presets");

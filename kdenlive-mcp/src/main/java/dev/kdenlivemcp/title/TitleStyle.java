@@ -12,10 +12,20 @@ package dev.kdenlivemcp.title;
  * @param boxFit draw the box as rounded rectangles that hug each line of text (TikTok / Reels caption look)
  *               instead of a band across the frame
  * @param boxRadius corner radius of a fitted box, px at 1080p
+ * @param align left, center or right
+ * @param marginX left/right margin as a fraction of the frame width (for left / right aligned text)
+ * @param y top of the text as a fraction of the frame height, overriding {@code position}; null to use position
  */
 public record TitleStyle(String id, String description, String font, int weight, int size, String color,
                          double outline, String outlineColor, String position, double fadeIn, double fadeOut,
-                         String box, boolean boxFit, double boxRadius) {
+                         String box, boolean boxFit, double boxRadius, String align, double marginX, Double y) {
+
+    public TitleStyle(String id, String description, String font, int weight, int size, String color,
+                      double outline, String outlineColor, String position, double fadeIn, double fadeOut,
+                      String box, boolean boxFit, double boxRadius) {
+        this(id, description, font, weight, size, color, outline, outlineColor, position, fadeIn, fadeOut, box,
+                boxFit, boxRadius, "center", 0, null);
+    }
 
     public TitleStyle(String id, String description, String font, int weight, int size, String color,
                       double outline, String outlineColor, String position, double fadeIn, double fadeOut,
